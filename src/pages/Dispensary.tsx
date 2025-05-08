@@ -619,13 +619,31 @@ const Dispensary = () => {
                             <Input 
                               type="text" 
                               inputMode="decimal"
-                              value={field.value}
+                              value={field.value.toString()}
                               onChange={(e) => {
-                                // Allow both . and , as decimal separators
-                                const inputValue = e.target.value.replace(/,/g, '.');
-                                const value = parseFloat(inputValue) || 0;
-                                field.onChange(value);
-                                updateDesiredPrice(value);
+                                // Fixed decimal input handling for both . and ,
+                                let inputValue = e.target.value;
+                                
+                                // Allow empty input (will be converted to 0)
+                                if (inputValue === '') {
+                                  field.onChange(0);
+                                  updateDesiredPrice(0);
+                                  return;
+                                }
+                                
+                                // Only allow valid numeric input with single decimal separator
+                                const validInput = /^\d*[.,]?\d*$/.test(inputValue);
+                                if (!validInput) return;
+                                
+                                // Convert comma to dot for calculation
+                                const normalizedValue = inputValue.replace(',', '.');
+                                
+                                // Update the field with the parsed numeric value
+                                const numValue = parseFloat(normalizedValue);
+                                if (!isNaN(numValue)) {
+                                  field.onChange(numValue);
+                                  updateDesiredPrice(numValue);
+                                }
                               }}
                             />
                           </div>
