@@ -1,5 +1,5 @@
 
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { MainLayout } from "@/components/MainLayout";
@@ -21,7 +21,6 @@ import NotFound from "@/pages/NotFound";
 import Users from "@/pages/Users";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
-import Index from "@/pages/Index";
 
 import './App.css';
 
@@ -31,33 +30,34 @@ function App() {
       <Router>
         <AuthProvider>
           <SettingsProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <SidebarProvider defaultOpen={true}>
+            <SidebarProvider defaultOpen={true}>
+              <Routes>
+                {/* Redirect from root to login */}
+                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="/login" element={<Login />} />
+                
+                <Route path="/" element={
+                  <ProtectedRoute>
                     <MainLayout />
-                  </SidebarProvider>
-                </ProtectedRoute>
-              }>
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="members" element={<Members />} />
-                <Route path="members/new" element={<MemberForm />} />
-                <Route path="members/:id" element={<MemberDetails />} />
-                <Route path="dispensary" element={<Dispensary />} />
-                <Route path="cash-register" element={<CashRegister />} />
-                <Route path="cash-management" element={<CashManagement />} />
-                <Route path="inventory" element={<Inventory />} />
-                <Route path="reports" element={<Reports />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="users" element={<Users />} />
-              </Route>
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <Toaster />
+                  </ProtectedRoute>
+                }>
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="members" element={<Members />} />
+                  <Route path="members/new" element={<MemberForm />} />
+                  <Route path="members/:id" element={<MemberDetails />} />
+                  <Route path="dispensary" element={<Dispensary />} />
+                  <Route path="cash-register" element={<CashRegister />} />
+                  <Route path="cash-management" element={<CashManagement />} />
+                  <Route path="inventory" element={<Inventory />} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="users" element={<Users />} />
+                </Route>
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <Toaster />
+            </SidebarProvider>
           </SettingsProvider>
         </AuthProvider>
       </Router>
