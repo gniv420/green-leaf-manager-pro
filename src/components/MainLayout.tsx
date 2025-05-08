@@ -1,9 +1,11 @@
+
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { 
   Cannabis, 
   Users, 
@@ -31,6 +33,7 @@ export const MainLayout = () => {
   const navigate = useNavigate();
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
   const { currentUser, logout } = useAuth();
+  const { associationName } = useSettings();
   
   useEffect(() => {
     setShowMobileMenu(false);
@@ -111,7 +114,7 @@ export const MainLayout = () => {
           : "w-[240px]"
       )}>
         <div className="p-4 h-[60px] border-b flex items-center justify-center">
-          <h1 className="text-lg font-bold">Cannabis Association</h1>
+          <h1 className="text-lg font-bold">{associationName}</h1>
         </div>
         
         <ScrollArea className="h-[calc(100vh-120px)]">

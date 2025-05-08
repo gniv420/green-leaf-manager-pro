@@ -19,6 +19,7 @@ import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
 import Users from "@/pages/Users";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import Index from "@/pages/Index";
 
 import './App.css';
@@ -28,27 +29,29 @@ function App() {
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <Router>
         <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            
-            <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="members" element={<Members />} />
-              <Route path="members/new" element={<MemberForm />} />
-              <Route path="members/:id" element={<MemberDetails />} />
-              <Route path="dispensary" element={<Dispensary />} />
-              <Route path="cash-register" element={<CashRegister />} />
-              <Route path="cash-management" element={<CashManagement />} />
-              <Route path="inventory" element={<Inventory />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="users" element={<Users />} />
-            </Route>
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
+          <SettingsProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              
+              <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="members" element={<Members />} />
+                <Route path="members/new" element={<MemberForm />} />
+                <Route path="members/:id" element={<MemberDetails />} />
+                <Route path="dispensary" element={<Dispensary />} />
+                <Route path="cash-register" element={<CashRegister />} />
+                <Route path="cash-management" element={<CashManagement />} />
+                <Route path="inventory" element={<Inventory />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="users" element={<Users />} />
+              </Route>
+              
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+          </SettingsProvider>
         </AuthProvider>
       </Router>
     </ThemeProvider>

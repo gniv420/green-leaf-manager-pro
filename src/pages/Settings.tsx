@@ -1,10 +1,13 @@
-
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { db } from '@/lib/db';
-import { Download, Database, Upload, FileDown } from 'lucide-react';
+import { Download, Database, Upload, FileDown, Palette } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSettings } from '@/contexts/SettingsContext';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +25,21 @@ const Settings = () => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  const {
+    associationName, 
+    setAssociationName,
+    primaryColor,
+    setPrimaryColor,
+    logoUrl,
+    setLogoUrl,
+    saveSettings
+  } = useSettings();
+
+  // State for customization settings
+  const [tempAssociationName, setTempAssociationName] = useState(associationName);
+  const [tempPrimaryColor, setTempPrimaryColor] = useState(primaryColor);
+  const [tempLogoUrl, setTempLogoUrl] = useState(logoUrl);
 
   const handleExportData = async () => {
     setIsExporting(true);
@@ -187,115 +205,204 @@ const Settings = () => {
     }
   };
 
+  const handleSaveCustomizations = () => {
+    setAssociationName(tempAssociationName);
+    setPrimaryColor(tempPrimaryColor);
+    setLogoUrl(tempLogoUrl);
+    saveSettings();
+    
+    toast({
+      title: 'Configuración guardada',
+      description: 'Los ajustes de personalización se han guardado correctamente'
+    });
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
 
-      <Card className="border-green-200">
-        <CardHeader>
-          <CardTitle>Administración de datos</CardTitle>
-          <CardDescription>
-            Opciones para exportar e importar datos
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Exportar datos (JSON)</CardTitle>
-                <CardDescription>
-                  Descarga una copia de respaldo de todos los datos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={handleExportData} 
-                  disabled={isExporting}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  {isExporting ? (
-                    <div className="flex items-center">
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
-                      Exportando...
-                    </div>
-                  ) : (
-                    <>
-                      <Download className="mr-2 h-4 w-4" />
-                      Exportar JSON
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Exportar datos (SQL)</CardTitle>
-                <CardDescription>
-                  Genera un script SQL para migración a SQLite
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={handleExportSQLite} 
-                  disabled={isExportingSql}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                >
-                  {isExportingSql ? (
-                    <div className="flex items-center">
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
-                      Exportando SQL...
-                    </div>
-                  ) : (
-                    <>
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Exportar SQL
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Importar datos</CardTitle>
+      <Tabs defaultValue="data" className="w-full">
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="data">Datos</TabsTrigger>
+          <TabsTrigger value="customization">Personalización</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="data">
+          <Card className="border-green-200">
+            <CardHeader>
+              <CardTitle>Administración de datos</CardTitle>
               <CardDescription>
-                Restaura datos desde un archivo de respaldo
+                Opciones para exportar e importar datos
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Exportar datos (JSON)</CardTitle>
+                    <CardDescription>
+                      Descarga una copia de respaldo de todos los datos
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button 
+                      onClick={handleExportData} 
+                      disabled={isExporting}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      {isExporting ? (
+                        <div className="flex items-center">
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
+                          Exportando...
+                        </div>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-4 w-4" />
+                          Exportar JSON
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Exportar datos (SQL)</CardTitle>
+                    <CardDescription>
+                      Genera un script SQL para migración a SQLite
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button 
+                      onClick={handleExportSQLite} 
+                      disabled={isExportingSql}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isExportingSql ? (
+                        <div className="flex items-center">
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
+                          Exportando SQL...
+                        </div>
+                      ) : (
+                        <>
+                          <FileDown className="mr-2 h-4 w-4" />
+                          Exportar SQL
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Importar datos</CardTitle>
+                  <CardDescription>
+                    Restaura datos desde un archivo de respaldo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    onClick={() => setIsImportDialogOpen(true)}
+                    className="w-full"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Importar
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              <div className="mt-6">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Información de base de datos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center">
+                      <Database className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span>
+                        Base de datos IndexedDB (almacenamiento local en navegador)
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Los datos se almacenan localmente en el navegador. Para migrar a SQLite en tu Raspberry Pi,
+                      usa la opción "Exportar SQL" y ejecuta el script en SQLite.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="customization">
+          <Card className="border-green-200">
+            <CardHeader>
+              <CardTitle>Personalización</CardTitle>
+              <CardDescription>
+                Personaliza la apariencia de la aplicación
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="associationName">Nombre de la asociación</Label>
+                <Input
+                  id="associationName"
+                  value={tempAssociationName}
+                  onChange={(e) => setTempAssociationName(e.target.value)}
+                  placeholder="Nombre de tu asociación"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Este nombre aparecerá en la barra lateral y otros elementos de la aplicación
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <Label htmlFor="primaryColor">Color principal</Label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    id="primaryColor"
+                    type="color"
+                    value={tempPrimaryColor}
+                    onChange={(e) => setTempPrimaryColor(e.target.value)}
+                    className="w-16 h-10 p-1 cursor-pointer"
+                  />
+                  <Input
+                    value={tempPrimaryColor}
+                    onChange={(e) => setTempPrimaryColor(e.target.value)}
+                    placeholder="#15803d"
+                    className="flex-1"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Este color se utilizará para los botones principales y elementos destacados
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <Label htmlFor="logoUrl">URL del logotipo (opcional)</Label>
+                <Input
+                  id="logoUrl"
+                  value={tempLogoUrl}
+                  onChange={(e) => setTempLogoUrl(e.target.value)}
+                  placeholder="https://ejemplo.com/logo.png"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Añade una URL para el logotipo de tu asociación (próximamente)
+                </p>
+              </div>
+              
               <Button 
-                onClick={() => setIsImportDialogOpen(true)}
-                className="w-full"
+                onClick={handleSaveCustomizations}
+                className="w-full bg-green-600 hover:bg-green-700 mt-4"
               >
-                <Upload className="mr-2 h-4 w-4" />
-                Importar
+                <Palette className="mr-2 h-4 w-4" />
+                Guardar personalización
               </Button>
             </CardContent>
           </Card>
-          
-          <div className="mt-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Información de base de datos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-center">
-                  <Database className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <span>
-                    Base de datos IndexedDB (almacenamiento local en navegador)
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Los datos se almacenan localmente en el navegador. Para migrar a SQLite en tu Raspberry Pi,
-                  usa la opción "Exportar SQL" y ejecuta el script en SQLite.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Import Dialog */}
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
