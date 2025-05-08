@@ -4,8 +4,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, CashTransaction } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/components/ui/toast';
-import { Cash, Plus, Search, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Coins, Plus, Search, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -127,7 +127,7 @@ const CashManagement = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Balance Actual</CardTitle>
-            <Cash className="h-4 w-4 text-muted-foreground" />
+            <Coins className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{currentBalance?.toFixed(2) || '0.00'}€</div>
