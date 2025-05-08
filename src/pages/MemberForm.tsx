@@ -93,7 +93,7 @@ const MemberForm = () => {
   const handleSponsorChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
-      sponsorId: value ? parseInt(value) : null,
+      sponsorId: value === "null" ? null : parseInt(value),
     }));
   };
 
@@ -224,14 +224,14 @@ const MemberForm = () => {
               <div className="space-y-2">
                 <Label htmlFor="sponsorId">Socio Avalista</Label>
                 <Select
-                  value={formData.sponsorId?.toString() || ''}
+                  value={formData.sponsorId?.toString() || "null"}
                   onValueChange={handleSponsorChange}
                 >
                   <SelectTrigger id="sponsorId" className="border-green-200 focus-visible:ring-green-500">
                     <SelectValue placeholder="Seleccionar avalista" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin avalista</SelectItem>
+                    <SelectItem value="null">Sin avalista</SelectItem>
                     {sponsors
                       .filter(sponsor => !isEditing || sponsor.id !== parseInt(id!))
                       .map(sponsor => (
