@@ -13,11 +13,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (!decimalInput) return;
       
-      // Only prevent if it's not a number, decimal point, or control key
-      const allowedKeys = /^[0-9.,]$/;
+      // Allow decimal points (both period and comma)
+      const allowedKeys = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", ","];
       const controlKeys = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter", "Home", "End"];
       
-      if (!allowedKeys.test(e.key) && !controlKeys.includes(e.key) && !e.ctrlKey && !e.metaKey) {
+      // Allow control keys, numbers and decimal points
+      if (!allowedKeys.includes(e.key) && !controlKeys.includes(e.key) && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
       }
     };
