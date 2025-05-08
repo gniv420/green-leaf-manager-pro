@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -142,6 +143,16 @@
 /* Fix for logout button text contrast */
 [data-sidebar="sidebar"] button span {
   @apply text-white font-medium;
+}
+
+/* Hide logo text when sidebar is collapsed but keep logo visible */
+[data-state="collapsed"] .sidebar-name {
+  display: none;
+}
+
+/* Center the logo when sidebar is collapsed */
+[data-state="collapsed"] [data-sidebar="header"] > div {
+  @apply justify-center;
 }
 
 /* Hide logout text when sidebar is collapsed and center the icon */

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -35,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -61,6 +61,13 @@ import { Separator } from '@/components/ui/separator';
 const formatNumber = (value: any): string => {
   const num = typeof value === 'number' ? value : Number(value);
   return isNaN(num) ? '0.00' : num.toFixed(2);
+};
+
+// Helper function to normalize input with comma or dot
+const normalizeDecimalInput = (value: string): number => {
+  // Replace comma with dot for calculation
+  const normalizedValue = value.replace(',', '.');
+  return parseFloat(normalizedValue) || 0;
 };
 
 // Interfaz para los items en el carrito
@@ -222,10 +229,11 @@ const Dispensary = () => {
     }
   };
 
-  // Update the actual grams dispensed
+  // Update the actual grams dispensed without changing the desired price
   const updateActualGrams = (value: number) => {
     setActualGrams(value);
     form.setValue('actualGrams', value);
+    // We don't update the desired price here - it stays the same
   };
 
   // Confirmar eliminación de dispensación
@@ -350,8 +358,8 @@ const Dispensary = () => {
         return;
       }
       
-      // Calcular precio total
-      const price = product.price * actualGrams;
+      // Usar el precio deseado para el pago, no el calculado por gramos reales
+      const price = data.desiredPrice;
       
       // Registrar dispensación
       const dispensaryId = await db.dispensary.add({
@@ -510,6 +518,9 @@ const Dispensary = () => {
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva Dispensación</DialogTitle>
+            <DialogDescription>
+              Complete los datos para registrar una nueva dispensación.
+            </DialogDescription>
           </DialogHeader>
           
           <Form {...form}>
@@ -605,12 +616,11 @@ const Dispensary = () => {
                           <div className="flex items-center">
                             <Euro className="mr-2 h-4 w-4 text-muted-foreground" />
                             <Input 
-                              type="number" 
-                              min="0"
-                              step="0.5" 
+                              type="text" 
+                              inputMode="decimal"
                               value={field.value}
                               onChange={(e) => {
-                                const value = parseFloat(e.target.value) || 0;
+                                const value = normalizeDecimalInput(e.target.value);
                                 field.onChange(value);
                                 updateDesiredPrice(value);
                               }}
@@ -634,7 +644,7 @@ const Dispensary = () => {
                           <div className="flex items-center">
                             <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
                             <Input 
-                              type="number"
+                              type="text"
                               readOnly
                               value={field.value}
                               className="bg-muted"
@@ -658,12 +668,11 @@ const Dispensary = () => {
                           <div className="flex items-center">
                             <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
                             <Input 
-                              type="number" 
-                              min="0.1" 
-                              step="0.1" 
+                              type="text" 
+                              inputMode="decimal"
                               value={field.value}
                               onChange={(e) => {
-                                const value = parseFloat(e.target.value) || 0;
+                                const value = normalizeDecimalInput(e.target.value);
                                 field.onChange(value);
                                 updateActualGrams(value);
                               }}
@@ -711,7 +720,7 @@ const Dispensary = () => {
                     <p className="font-medium mt-1">Cantidad a dispensar: {formatNumber(actualGrams)}g</p>
                   </div>
                   <div className="text-lg font-bold">
-                    Total: {formatNumber(cart[0].price * actualGrams)}€
+                    Total: {formatNumber(desiredPrice)}€
                   </div>
                 </div>
               )}

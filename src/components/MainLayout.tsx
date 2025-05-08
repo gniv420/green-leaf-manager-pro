@@ -103,13 +103,13 @@ export const MainLayout = () => {
     <div className="flex h-screen w-full bg-background">
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader className="flex items-center justify-center border-b">
-          <div className="flex items-center gap-2 p-2">
+          <div className="flex items-center justify-center gap-2 p-2">
             {logoPreview ? (
               <img src={logoPreview} alt="Logo" className="h-8 w-8 object-contain" />
             ) : (
               <Cannabis className="h-6 w-6 text-green-600" />
             )}
-            <span className="text-lg font-semibold truncate">{associationName}</span>
+            <span className="text-lg font-semibold truncate sidebar-name">{associationName}</span>
           </div>
         </SidebarHeader>
         
