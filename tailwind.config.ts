@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,18 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Custom colors for cannabis association
+				green: {
+					100: '#e7f5e1',
+					200: '#d0ebc3',
+					300: '#b8e0a4',
+					400: '#a1d686',
+					500: '#8acc68',
+					600: '#6ea353',
+					700: '#527a3f',
+					800: '#35522a',
+					900: '#192915',
 				}
 			},
 			borderRadius: {
