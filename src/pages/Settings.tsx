@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { db } from '@/lib/db';
-import { Download, Database, Upload } from 'lucide-react';
+import { Download, Database, Upload, FileDown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,7 @@ import {
 
 const Settings = () => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingSql, setIsExportingSql] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -67,6 +68,40 @@ const Settings = () => {
       });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleExportSQLite = async () => {
+    setIsExportingSql(true);
+    
+    try {
+      // Get SQL export script
+      const sqlScript = await db.exportAsSQLite();
+      
+      // Create blob and download
+      const blob = new Blob([sqlScript], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `greenleaf_sqlite_${new Date().toISOString().split('T')[0]}.sql`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Exportación SQL completada',
+        description: 'El script SQL se ha generado correctamente'
+      });
+    } catch (error) {
+      console.error('Error exporting SQL data:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo generar el script SQL'
+      });
+    } finally {
+      setIsExportingSql(false);
     }
   };
 
@@ -167,7 +202,7 @@ const Settings = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Exportar datos</CardTitle>
+                <CardTitle className="text-lg">Exportar datos (JSON)</CardTitle>
                 <CardDescription>
                   Descarga una copia de respaldo de todos los datos
                 </CardDescription>
@@ -186,7 +221,7 @@ const Settings = () => {
                   ) : (
                     <>
                       <Download className="mr-2 h-4 w-4" />
-                      Exportar
+                      Exportar JSON
                     </>
                   )}
                 </Button>
@@ -195,22 +230,50 @@ const Settings = () => {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Importar datos</CardTitle>
+                <CardTitle className="text-lg">Exportar datos (SQL)</CardTitle>
                 <CardDescription>
-                  Restaura datos desde un archivo de respaldo
+                  Genera un script SQL para migración a SQLite
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button 
-                  onClick={() => setIsImportDialogOpen(true)}
-                  className="w-full"
+                  onClick={handleExportSQLite} 
+                  disabled={isExportingSql}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
                 >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Importar
+                  {isExportingSql ? (
+                    <div className="flex items-center">
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
+                      Exportando SQL...
+                    </div>
+                  ) : (
+                    <>
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Exportar SQL
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Importar datos</CardTitle>
+              <CardDescription>
+                Restaura datos desde un archivo de respaldo
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => setIsImportDialogOpen(true)}
+                className="w-full"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Importar
+              </Button>
+            </CardContent>
+          </Card>
           
           <div className="mt-6">
             <Card>
@@ -221,12 +284,12 @@ const Settings = () => {
                 <div className="flex items-center">
                   <Database className="mr-2 h-4 w-4 text-muted-foreground" />
                   <span>
-                    Base de datos SQLite (IndexedDB) - Almacenamiento local en el navegador
+                    Base de datos IndexedDB (almacenamiento local en navegador)
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Los datos se almacenan localmente en el navegador. Para evitar pérdida de datos,
-                  realiza exportaciones periódicas.
+                  Los datos se almacenan localmente en el navegador. Para migrar a SQLite en tu Raspberry Pi,
+                  usa la opción "Exportar SQL" y ejecuta el script en SQLite.
                 </p>
               </CardContent>
             </Card>
