@@ -1,14 +1,32 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { db, Member } from '@/lib/db';
+import { db, Member, MemberTransaction } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import DocumentsSection from '@/components/DocumentsSection';
+import { Eye, EyeOff, Plus, Minus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const MemberForm = () => {
   const { id } = useParams();
@@ -23,11 +41,18 @@ const MemberForm = () => {
     dni: '',
     consumptionGrams: 0,
     sponsorId: null,
+    balance: 0,
   });
 
   const [sponsors, setSponsors] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSensitiveInfo, setShowSensitiveInfo] = useState(false);
+  const [walletDialogOpen, setWalletDialogOpen] = useState(false);
+  const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
+  const [transactionAmount, setTransactionAmount] = useState<number>(0);
+  const [transactionNotes, setTransactionNotes] = useState<string>('');
+  const [transactions, setTransactions] = useState<MemberTransaction[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,7 +74,18 @@ const MemberForm = () => {
               dni: member.dni,
               consumptionGrams: member.consumptionGrams,
               sponsorId: member.sponsorId,
+              balance: member.balance || 0,
             });
+
+            // Fetch member transactions
+            if (memberId) {
+              const memberTransactions = await db.memberTransactions
+                .where('memberId')
+                .equals(memberId)
+                .reverse()
+                .sortBy('createdAt');
+              setTransactions(memberTransactions);
+            }
           } else {
             toast({
               variant: 'destructive',
@@ -138,6 +174,77 @@ const MemberForm = () => {
     }
   };
 
+  const toggleSensitiveInfo = () => {
+    setShowSensitiveInfo(!showSensitiveInfo);
+  };
+
+  const maskedValue = (value: string) => {
+    if (!showSensitiveInfo) {
+      return value.replace(/./g, '•');
+    }
+    return value;
+  };
+
+  const handleWalletTransaction = async () => {
+    if (!id || transactionAmount <= 0) return;
+
+    try {
+      const memberId = parseInt(id);
+      const userId = 1; // En una app real, sería el usuario logueado
+      
+      // Add transaction record
+      await db.memberTransactions.add({
+        memberId,
+        amount: transactionAmount,
+        type: transactionType,
+        notes: transactionNotes,
+        userId,
+        createdAt: new Date(),
+      });
+
+      // Update member balance
+      const newBalance = transactionType === 'deposit' 
+        ? formData.balance + transactionAmount 
+        : formData.balance - transactionAmount;
+      
+      await db.members.update(memberId, { 
+        balance: newBalance,
+        updatedAt: new Date(),
+      });
+
+      // Update local state
+      setFormData(prev => ({
+        ...prev,
+        balance: newBalance
+      }));
+
+      // Refresh transactions
+      const updatedTransactions = await db.memberTransactions
+        .where('memberId')
+        .equals(memberId)
+        .reverse()
+        .sortBy('createdAt');
+      setTransactions(updatedTransactions);
+
+      toast({
+        title: 'Monedero actualizado',
+        description: `Se ha ${transactionType === 'deposit' ? 'añadido' : 'retirado'} ${transactionAmount}€ correctamente`
+      });
+
+      // Reset form
+      setTransactionAmount(0);
+      setTransactionNotes('');
+      setWalletDialogOpen(false);
+    } catch (error) {
+      console.error('Error processing transaction:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo procesar la transacción'
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -154,128 +261,416 @@ const MemberForm = () => {
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card className="border-green-200">
-          <CardHeader>
-            <CardTitle>Datos personales</CardTitle>
-            <CardDescription>
-              Información básica del socio
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">Nombre</Label>
-                <Input
-                  id="firstName"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleInputChange}
-                  required
-                  className="border-green-200 focus-visible:ring-green-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Apellidos</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleInputChange}
-                  required
-                  className="border-green-200 focus-visible:ring-green-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dni">DNI/NIE</Label>
-                <Input
-                  id="dni"
-                  name="dni"
-                  value={formData.dni}
-                  onChange={handleInputChange}
-                  required
-                  className="border-green-200 focus-visible:ring-green-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dob">Fecha de Nacimiento</Label>
-                <Input
-                  id="dob"
-                  type="date"
-                  value={formData.dob.toISOString().split('T')[0]}
-                  onChange={handleDateChange}
-                  required
-                  className="border-green-200 focus-visible:ring-green-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="consumptionGrams">Previsión de Consumo (g/mes)</Label>
-                <Input
-                  id="consumptionGrams"
-                  name="consumptionGrams"
-                  type="number"
-                  min="0"
-                  value={formData.consumptionGrams}
-                  onChange={handleInputChange}
-                  required
-                  className="border-green-200 focus-visible:ring-green-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sponsorId">Socio Avalista</Label>
-                <Select
-                  value={formData.sponsorId?.toString() || "null"}
-                  onValueChange={handleSponsorChange}
-                >
-                  <SelectTrigger id="sponsorId" className="border-green-200 focus-visible:ring-green-500">
-                    <SelectValue placeholder="Seleccionar avalista" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="null">Sin avalista</SelectItem>
-                    {sponsors
-                      .filter(sponsor => !isEditing || sponsor.id !== parseInt(id!))
-                      .map(sponsor => (
+      {isEditing && (
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList>
+            <TabsTrigger value="details">Detalles</TabsTrigger>
+            <TabsTrigger value="wallet">Monedero</TabsTrigger>
+            <TabsTrigger value="documents">Documentos</TabsTrigger>
+          </TabsList>
+          <TabsContent value="details">
+            <form onSubmit={handleSubmit}>
+              <Card className="border-green-200">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Datos personales</CardTitle>
+                    <CardDescription>
+                      Información básica del socio
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    type="button"
+                    onClick={toggleSensitiveInfo}
+                    title={showSensitiveInfo ? "Ocultar información sensible" : "Mostrar información sensible"}
+                  >
+                    {showSensitiveInfo ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">Nombre</Label>
+                      <Input
+                        id="firstName"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        required
+                        className="border-green-200 focus-visible:ring-green-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Apellidos</Label>
+                      <Input
+                        id="lastName"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        required
+                        className="border-green-200 focus-visible:ring-green-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dni">DNI/NIE</Label>
+                      <Input
+                        id="dni"
+                        name="dni"
+                        value={maskedValue(formData.dni)}
+                        onChange={handleInputChange}
+                        required
+                        className="border-green-200 focus-visible:ring-green-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dob">Fecha de Nacimiento</Label>
+                      <Input
+                        id="dob"
+                        type="date"
+                        value={maskedValue(formData.dob.toISOString().split('T')[0])}
+                        onChange={handleDateChange}
+                        required
+                        className="border-green-200 focus-visible:ring-green-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="consumptionGrams">Previsión de Consumo (g/mes)</Label>
+                      <Input
+                        id="consumptionGrams"
+                        name="consumptionGrams"
+                        type="number"
+                        min="0"
+                        value={formData.consumptionGrams}
+                        onChange={handleInputChange}
+                        required
+                        className="border-green-200 focus-visible:ring-green-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sponsorId">Socio Avalista</Label>
+                      <Select
+                        value={formData.sponsorId?.toString() || "null"}
+                        onValueChange={handleSponsorChange}
+                      >
+                        <SelectTrigger id="sponsorId" className="border-green-200 focus-visible:ring-green-500">
+                          <SelectValue placeholder="Seleccionar avalista" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="null">Sin avalista</SelectItem>
+                          {sponsors
+                            .filter(sponsor => !isEditing || sponsor.id !== parseInt(id!))
+                            .map(sponsor => (
+                              <SelectItem key={sponsor.id} value={sponsor.id!.toString()}>
+                                {sponsor.firstName} {sponsor.lastName} ({sponsor.dni})
+                              </SelectItem>
+                            ))
+                          }
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="balance">Balance del Monedero (€)</Label>
+                      <div className="flex items-center">
+                        <Input
+                          id="balance"
+                          type="number"
+                          value={formData.balance}
+                          readOnly
+                          className="border-green-200 focus-visible:ring-green-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/members')}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isSaving ? (
+                      <div className="flex items-center">
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
+                        Guardando...
+                      </div>
+                    ) : (
+                      'Guardar'
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="wallet">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Monedero Electrónico</CardTitle>
+                    <CardDescription>Gestión del saldo del socio</CardDescription>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-muted-foreground">Balance Actual</div>
+                    <div className="text-2xl font-bold text-green-600">{formData.balance.toFixed(2)} €</div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap gap-4">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 border-green-200 hover:bg-green-50"
+                      onClick={() => {
+                        setTransactionType('deposit');
+                        setWalletDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4 text-green-600" /> Añadir Fondos
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 border-red-200 hover:bg-red-50"
+                      disabled={formData.balance <= 0}
+                      onClick={() => {
+                        setTransactionType('withdrawal');
+                        setWalletDialogOpen(true);
+                      }}
+                    >
+                      <Minus className="mr-2 h-4 w-4 text-red-600" /> Retirar Fondos
+                    </Button>
+                  </div>
+                  
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Importe</TableHead>
+                          <TableHead>Notas</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.length > 0 ? (
+                          transactions.map(transaction => (
+                            <TableRow key={transaction.id}>
+                              <TableCell>{new Date(transaction.createdAt).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                <span className={transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'}>
+                                  {transaction.type === 'deposit' ? 'Ingreso' : 'Retirada'}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <span className={transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'}>
+                                  {transaction.type === 'deposit' ? '+' : '-'}{transaction.amount.toFixed(2)} €
+                                </span>
+                              </TableCell>
+                              <TableCell>{transaction.notes}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-24 text-center">
+                              No hay transacciones registradas.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <DocumentsSection memberId={parseInt(id!)} />
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {!isEditing && (
+        <form onSubmit={handleSubmit}>
+          <Card className="border-green-200">
+            <CardHeader>
+              <CardTitle>Datos personales</CardTitle>
+              <CardDescription>
+                Información básica del socio
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">Nombre</Label>
+                  <Input
+                    id="firstName"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    required
+                    className="border-green-200 focus-visible:ring-green-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Apellidos</Label>
+                  <Input
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    required
+                    className="border-green-200 focus-visible:ring-green-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dni">DNI/NIE</Label>
+                  <Input
+                    id="dni"
+                    name="dni"
+                    value={formData.dni}
+                    onChange={handleInputChange}
+                    required
+                    className="border-green-200 focus-visible:ring-green-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dob">Fecha de Nacimiento</Label>
+                  <Input
+                    id="dob"
+                    type="date"
+                    value={formData.dob.toISOString().split('T')[0]}
+                    onChange={handleDateChange}
+                    required
+                    className="border-green-200 focus-visible:ring-green-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="consumptionGrams">Previsión de Consumo (g/mes)</Label>
+                  <Input
+                    id="consumptionGrams"
+                    name="consumptionGrams"
+                    type="number"
+                    min="0"
+                    value={formData.consumptionGrams}
+                    onChange={handleInputChange}
+                    required
+                    className="border-green-200 focus-visible:ring-green-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sponsorId">Socio Avalista</Label>
+                  <Select
+                    value={formData.sponsorId?.toString() || "null"}
+                    onValueChange={handleSponsorChange}
+                  >
+                    <SelectTrigger id="sponsorId" className="border-green-200 focus-visible:ring-green-500">
+                      <SelectValue placeholder="Seleccionar avalista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="null">Sin avalista</SelectItem>
+                      {sponsors.map(sponsor => (
                         <SelectItem key={sponsor.id} value={sponsor.id!.toString()}>
                           {sponsor.firstName} {sponsor.lastName} ({sponsor.dni})
                         </SelectItem>
-                      ))
-                    }
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/members')}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isSaving}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isSaving ? (
+                  <div className="flex items-center">
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
+                    Guardando...
+                  </div>
+                ) : (
+                  'Guardar'
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </form>
+      )}
+
+      <Dialog open={walletDialogOpen} onOpenChange={setWalletDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {transactionType === 'deposit' ? 'Añadir Fondos' : 'Retirar Fondos'}
+            </DialogTitle>
+            <DialogDescription>
+              {transactionType === 'deposit' 
+                ? 'Introduce la cantidad a añadir al monedero del socio.'
+                : 'Introduce la cantidad a retirar del monedero del socio.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Importe (€)</Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                max={transactionType === 'withdrawal' ? formData.balance : undefined}
+                value={transactionAmount}
+                onChange={(e) => setTransactionAmount(Number(e.target.value))}
+                className="border-green-200 focus-visible:ring-green-500"
+              />
             </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate('/members')}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notas</Label>
+              <Input
+                id="notes"
+                value={transactionNotes}
+                onChange={(e) => setTransactionNotes(e.target.value)}
+                placeholder="Motivo de la transacción"
+                className="border-green-200 focus-visible:ring-green-500"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setWalletDialogOpen(false)}
             >
               Cancelar
             </Button>
             <Button 
-              type="submit" 
-              disabled={isSaving}
-              className="bg-green-600 hover:bg-green-700"
+              onClick={handleWalletTransaction}
+              disabled={transactionAmount <= 0 || (transactionType === 'withdrawal' && transactionAmount > formData.balance)}
+              className={transactionType === 'deposit' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
             >
-              {isSaving ? (
-                <div className="flex items-center">
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
-                  Guardando...
-                </div>
-              ) : (
-                'Guardar'
-              )}
+              {transactionType === 'deposit' ? 'Añadir' : 'Retirar'}
             </Button>
-          </CardFooter>
-        </Card>
-      </form>
-
-      {isEditing && id && (
-        <div className="mt-6">
-          <DocumentsSection memberId={parseInt(id)} />
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

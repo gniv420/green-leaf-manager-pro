@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -60,9 +61,8 @@ const Inventory = () => {
     defaultValues: {
       name: '',
       category: '',
-      thcPercentage: 0,
-      cbdPercentage: 0,
       description: '',
+      costPrice: 0,
       price: 0,
       stockGrams: 0,
     }
@@ -73,9 +73,8 @@ const Inventory = () => {
       form.reset({
         name: editingProduct.name,
         category: editingProduct.category,
-        thcPercentage: editingProduct.thcPercentage,
-        cbdPercentage: editingProduct.cbdPercentage,
         description: editingProduct.description,
+        costPrice: editingProduct.costPrice || 0,
         price: editingProduct.price,
         stockGrams: editingProduct.stockGrams,
       });
@@ -83,9 +82,8 @@ const Inventory = () => {
       form.reset({
         name: '',
         category: '',
-        thcPercentage: 0,
-        cbdPercentage: 0,
         description: '',
+        costPrice: 0,
         price: 0,
         stockGrams: 0,
       });
@@ -187,10 +185,10 @@ const Inventory = () => {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Categoría</TableHead>
-                  <TableHead>THC%</TableHead>
-                  <TableHead>CBD%</TableHead>
-                  <TableHead>Precio</TableHead>
+                  <TableHead>Precio Coste</TableHead>
+                  <TableHead>Precio Dispensación</TableHead>
                   <TableHead>Stock (g)</TableHead>
+                  <TableHead>Beneficio</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -206,13 +204,17 @@ const Inventory = () => {
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>{product.thcPercentage}%</TableCell>
-                    <TableCell>{product.cbdPercentage}%</TableCell>
+                    <TableCell>{(product.costPrice || 0).toFixed(2)}€</TableCell>
                     <TableCell>{product.price.toFixed(2)}€</TableCell>
                     <TableCell>
                       <span className={product.stockGrams < 10 ? "text-destructive font-medium" : ""}>
                         {product.stockGrams.toFixed(2)}g
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      {product.costPrice !== undefined ? (
+                        ((product.price - product.costPrice) / product.costPrice * 100).toFixed(2) + "%"
+                      ) : "N/A"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -268,12 +270,12 @@ const Inventory = () => {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="thcPercentage"
+                  name="costPrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>THC %</FormLabel>
+                      <FormLabel>Precio de Coste (€)</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" min="0" max="100" />
+                        <Input {...field} type="number" step="0.01" min="0" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -281,12 +283,12 @@ const Inventory = () => {
                 />
                 <FormField
                   control={form.control}
-                  name="cbdPercentage"
+                  name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CBD %</FormLabel>
+                      <FormLabel>Precio de Dispensación (€)</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" min="0" max="100" />
+                        <Input {...field} type="number" step="0.01" min="0" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -306,34 +308,19 @@ const Inventory = () => {
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Precio (€)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="0.01" min="0" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="stockGrams"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock (gramos)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="0.01" min="0" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="stockGrams"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stock (gramos)</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="number" step="0.01" min="0" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter>
                 <Button type="submit">{editingProduct ? 'Actualizar' : 'Añadir'}</Button>
               </DialogFooter>

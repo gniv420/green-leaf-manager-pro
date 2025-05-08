@@ -5,8 +5,8 @@ import { db, Member } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Search, Plus, Trash2 } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { Pencil, Search, Plus, Trash2, Grid, List } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,8 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
+import MemberCard from '@/components/MemberCard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Members = () => {
   const [members, setMembers] = useState<Member[]>([]);
@@ -22,6 +24,7 @@ const Members = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -104,8 +107,8 @@ const Members = () => {
         </Button>
       </div>
 
-      <div className="flex items-center space-x-2">
-        <div className="relative flex-1">
+      <div className="flex items-center justify-between">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre, apellido o DNI..."
@@ -114,6 +117,22 @@ const Members = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <div className="flex space-x-2">
+          <Button 
+            variant={viewMode === 'list' ? 'default' : 'outline'} 
+            size="icon"
+            onClick={() => setViewMode('list')}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant={viewMode === 'grid' ? 'default' : 'outline'} 
+            size="icon"
+            onClick={() => setViewMode('grid')}
+          >
+            <Grid className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -121,61 +140,83 @@ const Members = () => {
           <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
         </div>
       ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>DNI</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Apellidos</TableHead>
-                <TableHead>Fecha de Nacimiento</TableHead>
-                <TableHead>Consumo (g)</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <>
+          {viewMode === 'list' && (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>DNI</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Apellidos</TableHead>
+                    <TableHead>Fecha de Nacimiento</TableHead>
+                    <TableHead>Consumo (g)</TableHead>
+                    <TableHead>Saldo</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMembers.length > 0 ? (
+                    filteredMembers.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell>{member.dni}</TableCell>
+                        <TableCell>{member.firstName}</TableCell>
+                        <TableCell>{member.lastName}</TableCell>
+                        <TableCell>
+                          {new Date(member.dob).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{member.consumptionGrams}</TableCell>
+                        <TableCell>{(member.balance || 0).toFixed(2)} €</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            asChild
+                          >
+                            <Link to={`/members/${member.id}`}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => confirmDelete(member.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        {searchTerm
+                          ? 'No se encontraron socios que coincidan con la búsqueda'
+                          : 'No hay socios registrados'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {viewMode === 'grid' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredMembers.length > 0 ? (
                 filteredMembers.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>{member.dni}</TableCell>
-                    <TableCell>{member.firstName}</TableCell>
-                    <TableCell>{member.lastName}</TableCell>
-                    <TableCell>
-                      {new Date(member.dob).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>{member.consumptionGrams}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        asChild
-                      >
-                        <Link to={`/members/${member.id}`}>
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => confirmDelete(member.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                  <MemberCard key={member.id} member={member} />
                 ))
               ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    {searchTerm
-                      ? 'No se encontraron socios que coincidan con la búsqueda'
-                      : 'No hay socios registrados'}
-                  </TableCell>
-                </TableRow>
+                <div className="col-span-full text-center p-8 border rounded-md">
+                  {searchTerm
+                    ? 'No se encontraron socios que coincidan con la búsqueda'
+                    : 'No hay socios registrados'}
+                </div>
               )}
-            </TableBody>
-          </Table>
-        </div>
+            </div>
+          )}
+        </>
       )}
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

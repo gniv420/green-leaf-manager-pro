@@ -18,6 +18,7 @@ export interface Member {
   dni: string;
   consumptionGrams: number;
   sponsorId: number | null;
+  balance: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,9 +37,8 @@ export interface Product {
   id?: number;
   name: string;
   category: string; // Flor, Extracto, Comestible, etc.
-  thcPercentage: number;
-  cbdPercentage: number;
   description: string;
+  costPrice: number;
   price: number;
   stockGrams: number;
   createdAt: Date;
@@ -66,6 +66,16 @@ export interface Dispensary {
   createdAt: Date;
 }
 
+export interface MemberTransaction {
+  id?: number;
+  memberId: number;
+  amount: number;
+  type: 'deposit' | 'withdrawal';
+  notes: string;
+  userId: number; // Usuario que registra
+  createdAt: Date;
+}
+
 // Create the database class
 class CannabisDexie extends Dexie {
   users!: Table<User>;
@@ -74,17 +84,19 @@ class CannabisDexie extends Dexie {
   products!: Table<Product>;
   cashTransactions!: Table<CashTransaction>;
   dispensary!: Table<Dispensary>;
+  memberTransactions!: Table<MemberTransaction>;
 
   constructor() {
     super('cannabisAssociationDB');
     
-    this.version(3).stores({
+    this.version(4).stores({
       users: '++id, username, createdAt',
       members: '++id, firstName, lastName, dni, sponsorId, createdAt',
       documents: '++id, memberId, createdAt',
       products: '++id, name, category, createdAt',
       cashTransactions: '++id, type, createdAt',
-      dispensary: '++id, memberId, productId, createdAt'
+      dispensary: '++id, memberId, productId, createdAt',
+      memberTransactions: '++id, memberId, type, createdAt'
     });
 
     // Initialize with admin user if it doesn't exist
