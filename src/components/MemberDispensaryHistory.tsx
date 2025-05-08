@@ -13,6 +13,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Cannabis } from 'lucide-react';
+import { formatDecimal } from '@/lib/utils';
 
 interface MemberDispensaryHistoryProps {
   memberId?: number;
@@ -67,11 +68,11 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="p-4 border rounded-lg">
           <p className="text-sm text-muted-foreground">Total dispensado</p>
-          <p className="text-xl font-bold">{formatNumber(totalDispensed)} g</p>
+          <p className="text-xl font-bold">{formatDecimal(totalDispensed)} g</p>
         </div>
         <div className="p-4 border rounded-lg">
           <p className="text-sm text-muted-foreground">Total gastado</p>
-          <p className="text-xl font-bold">{formatNumber(totalSpent)} €</p>
+          <p className="text-xl font-bold">{formatDecimal(totalSpent)} €</p>
         </div>
       </div>
 
@@ -92,8 +93,8 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
                   {format(new Date(record.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
                 </TableCell>
                 <TableCell>{record.productName}</TableCell>
-                <TableCell>{formatNumber(record.quantity)} g</TableCell>
-                <TableCell className="text-right">{formatNumber(record.price)} €</TableCell>
+                <TableCell>{formatDecimal(record.quantity)} g</TableCell>
+                <TableCell className="text-right">{formatDecimal(record.price)} €</TableCell>
               </TableRow>
             ))}
           </TableBody>
