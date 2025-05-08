@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -571,7 +572,7 @@ const Dispensary = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {filteredProducts?.map((product) => (
                     <Card 
                       key={product.id} 
@@ -582,11 +583,13 @@ const Dispensary = () => {
                       }`}
                       onClick={() => addToCart(product)}
                     >
-                      <CardContent className="p-3">
+                      <CardContent className="p-2">
                         <div className="flex flex-col">
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {formatNumber(product.price)}€/g · 
+                          <div className="font-medium text-sm">{product.name}</div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {formatNumber(product.price)}€/g
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
                             Stock: {formatNumber(product.stockGrams)}g
                           </div>
                         </div>
