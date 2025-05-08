@@ -174,8 +174,19 @@ const Dispensary = () => {
     if (preselectedMemberId) {
       form.setValue('memberId', preselectedMemberId);
       setSelectedMemberId(preselectedMemberId);
+      
+      // Automatically open the dispensary dialog when a member ID is provided in URL
+      if (currentCashRegister) {
+        setIsAddDialogOpen(true);
+      } else {
+        toast({
+          variant: 'warning',
+          title: 'Caja cerrada',
+          description: 'Debes abrir una caja antes de realizar dispensaciones.'
+        });
+      }
     }
-  }, [preselectedMemberId, form]);
+  }, [preselectedMemberId, form, currentCashRegister, toast]);
 
   // Calculate grams based on price when cart changes or desired price changes
   useEffect(() => {
