@@ -39,7 +39,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       }
     };
     
-    // Si es un campo decimal, forzamos type="text" para evitar el comportamiento nativo de 'number'
+    // Use number type if specified and not decimalInput mode
     const inputType = decimalInput ? "text" : type;
     
     return (

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -57,7 +56,7 @@ import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Separator } from '@/components/ui/separator';
-import { normalizeDecimalInput } from '@/lib/utils';
+import { normalizeDecimalInput, formatDecimal } from '@/lib/utils';
 
 // Helper function to safely format numbers
 const formatNumber = (value: any): string => {
@@ -491,8 +490,8 @@ const Dispensary = () => {
                     <TableCell className="font-mono">{record.memberCode}</TableCell>
                     <TableCell className="font-medium">{record.memberName}</TableCell>
                     <TableCell>{record.productName}</TableCell>
-                    <TableCell>{formatNumber(record.quantity)}g</TableCell>
-                    <TableCell className="text-right">{formatNumber(record.price)}€</TableCell>
+                    <TableCell>{formatDecimal(record.quantity)}g</TableCell>
+                    <TableCell className="text-right">{formatDecimal(record.price)}€</TableCell>
                     <TableCell className="text-center">
                       <Button
                         variant="ghost"
@@ -581,10 +580,10 @@ const Dispensary = () => {
                         <div className="flex flex-col">
                           <div className="font-medium text-sm truncate">{product.name}</div>
                           <div className="text-sm text-muted-foreground mt-1">
-                            {formatNumber(product.price)}€/g
+                            {formatDecimal(product.price)}€/g
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Stock: {formatNumber(product.stockGrams)}g
+                            Stock: {formatDecimal(product.stockGrams)}g
                           </div>
                         </div>
                       </CardContent>
@@ -596,7 +595,7 @@ const Dispensary = () => {
                   <div className="mt-4 p-4 bg-secondary/30 rounded-md">
                     <h4 className="font-medium mb-2">Producto seleccionado: {cart[0].productName}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Precio: {formatNumber(cart[0].price)}€/g
+                      Precio: {formatDecimal(cart[0].price)}€/g
                     </p>
                   </div>
                 )}
@@ -614,31 +613,16 @@ const Dispensary = () => {
                           <div className="flex items-center">
                             <Euro className="mr-2 h-4 w-4 text-muted-foreground" />
                             <Input 
-                              type="text" 
+                              type="number"
+                              step="0.01"
+                              min="0"
                               inputMode="decimal"
-                              decimalInput={true}
-                              value={field.value === 0 ? "" : field.value.toString().replace('.', ',')}
+                              value={field.value || ""}
                               onChange={(e) => {
-                                let inputValue = e.target.value;
-                                
-                                // Allow empty input (will be converted to 0)
-                                if (inputValue === '') {
-                                  field.onChange(0);
-                                  updateDesiredPrice(0);
-                                  return;
-                                }
-                                
-                                // Only allow valid numeric input with comma
-                                if (!/^\d*,?\d*$/.test(inputValue)) return;
-                                
-                                // Normalize the input (replace comma with dot for calculation)
-                                const normalizedValue = inputValue.replace(',', '.');
-                                
-                                // Update the field with the parsed numeric value
-                                const numValue = parseFloat(normalizedValue);
-                                if (!isNaN(numValue)) {
-                                  field.onChange(numValue);
-                                  updateDesiredPrice(numValue);
+                                const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                if (!isNaN(value)) {
+                                  field.onChange(value);
+                                  updateDesiredPrice(value);
                                 }
                               }}
                             />
@@ -661,9 +645,9 @@ const Dispensary = () => {
                           <div className="flex items-center">
                             <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
                             <Input 
-                              type="text"
+                              type="number"
                               readOnly
-                              value={field.value === 0 ? "" : field.value.toString().replace('.', ',')}
+                              value={field.value || ""}
                               className="bg-muted"
                             />
                           </div>
@@ -685,31 +669,16 @@ const Dispensary = () => {
                           <div className="flex items-center">
                             <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
                             <Input 
-                              type="text"
+                              type="number"
+                              step="0.01"
+                              min="0"
                               inputMode="decimal"
-                              decimalInput={true}
-                              value={field.value === 0 ? "" : field.value.toString().replace('.', ',')}
+                              value={field.value || ""}
                               onChange={(e) => {
-                                let inputValue = e.target.value;
-                                
-                                // Allow empty input
-                                if (inputValue === '') {
-                                  field.onChange(0);
-                                  updateActualGrams(0);
-                                  return;
-                                }
-                                
-                                // Only allow valid numeric input with comma
-                                if (!/^\d*,?\d*$/.test(inputValue)) return;
-                                
-                                // Normalize the input for calculation
-                                const normalizedValue = inputValue.replace(',', '.');
-                                
-                                // Parse and update
-                                const numValue = parseFloat(normalizedValue);
-                                if (!isNaN(numValue)) {
-                                  field.onChange(numValue);
-                                  updateActualGrams(numValue);
+                                const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                if (!isNaN(value)) {
+                                  field.onChange(value);
+                                  updateActualGrams(value);
                                 }
                               }}
                             />
@@ -752,11 +721,11 @@ const Dispensary = () => {
                 <div className="flex justify-between items-center mt-4 p-4 bg-secondary/50 rounded-md">
                   <div className="text-sm">
                     <p className="font-medium">Producto: {cart[0].productName}</p>
-                    <p className="font-medium mt-1">Precio por gramo: {formatNumber(cart[0].price)}€</p>
-                    <p className="font-medium mt-1">Cantidad a dispensar: {formatNumber(actualGrams)}g</p>
+                    <p className="font-medium mt-1">Precio por gramo: {formatDecimal(cart[0].price)}€</p>
+                    <p className="font-medium mt-1">Cantidad a dispensar: {formatDecimal(actualGrams)}g</p>
                   </div>
                   <div className="text-lg font-bold">
-                    Total: {formatNumber(desiredPrice)}€
+                    Total: {formatDecimal(desiredPrice)}€
                   </div>
                 </div>
               )}
