@@ -142,7 +142,12 @@
 
 /* Fix for logout button text contrast */
 [data-sidebar="sidebar"] button span {
-  @apply text-sidebar-foreground font-medium;
+  @apply text-white font-medium;
+}
+
+/* Make logout button more visible in collapsed state */
+[data-sidebar] [data-state="collapsed"] button[data-sidebar="menu-button"] span {
+  @apply opacity-0;
 }
 
 /* Custom card shadow */
