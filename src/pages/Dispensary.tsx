@@ -17,7 +17,8 @@ import {
   Scale, 
   ArrowRight, 
   Trash, 
-  AlertCircle 
+  AlertCircle,
+  Euro
 } from 'lucide-react';
 import {
   Table,
@@ -51,12 +52,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
 import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -85,12 +80,11 @@ const Dispensary = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [dispensaryToDelete, setDispensaryToDelete] = useState<number | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string>(preselectedMemberId || '');
-  const [selectedProductId, setSelectedProductId] = useState<string>('');
-  const [dispensaryMode, setDispensaryMode] = useState<'single' | 'multiple'>('single');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [productSearchQuery, setProductSearchQuery] = useState('');
-  const [quantity, setQuantity] = useState<number>(1);
-  const [actualQuantity, setActualQuantity] = useState<number>(1);
+  const [desiredPrice, setDesiredPrice] = useState<number>(0);
+  const [calculatedGrams, setCalculatedGrams] = useState<number>(0);
+  const [actualGrams, setActualGrams] = useState<number>(0);
   const { toast } = useToast();
 
   const dispensaryRecords = useLiveQuery(
@@ -143,8 +137,6 @@ const Dispensary = () => {
     }));
   });
 
-  const selectedProduct = products?.find(product => product.id === Number(selectedProductId));
-
   // Productos filtrados por búsqueda
   const filteredProducts = products?.filter(product => 
     product.name.toLowerCase().includes(productSearchQuery.toLowerCase())
@@ -160,19 +152,19 @@ const Dispensary = () => {
 
   type FormValues = {
     memberId: string;
-    productId: string;
     paymentMethod: 'cash' | 'bizum' | 'wallet';
-    quantity: number;
-    actualQuantity: number;
+    desiredPrice: number;
+    calculatedGrams: number;
+    actualGrams: number;
   };
 
   const form = useForm<FormValues>({
     defaultValues: {
       memberId: preselectedMemberId || '',
-      productId: '',
       paymentMethod: 'cash',
-      quantity: 1,
-      actualQuantity: 1
+      desiredPrice: 0,
+      calculatedGrams: 0,
+      actualGrams: 0
     }
   });
   
@@ -184,60 +176,56 @@ const Dispensary = () => {
     }
   }, [preselectedMemberId, form]);
 
+  // Calculate grams based on price when cart changes or desired price changes
+  useEffect(() => {
+    if (cart.length === 1 && desiredPrice > 0) {
+      const product = cart[0];
+      const calculatedAmount = desiredPrice / product.price;
+      setCalculatedGrams(parseFloat(calculatedAmount.toFixed(2)));
+      setActualGrams(parseFloat(calculatedAmount.toFixed(2)));
+      form.setValue('calculatedGrams', parseFloat(calculatedAmount.toFixed(2)));
+      form.setValue('actualGrams', parseFloat(calculatedAmount.toFixed(2)));
+    }
+  }, [cart, desiredPrice, form]);
+
   // Añadir producto al carrito
   const addToCart = (product: Product) => {
-    setCart(prevCart => {
-      // Verificar si el producto ya está en el carrito
-      const existing = prevCart.find(item => item.productId === product.id);
-      
-      if (existing) {
-        // Incrementar cantidad si ya existe
-        return prevCart.map(item => 
-          item.productId === product.id 
-            ? { ...item, quantity: item.quantity + 0.5 } 
-            : item
-        );
-      } else {
-        // Añadir nuevo item al carrito
-        return [...prevCart, {
-          productId: product.id!,
-          productName: product.name,
-          price: product.price,
-          quantity: 0.5
-        }];
-      }
-    });
+    // Clear the cart first to ensure only one product is selected
+    setCart([{
+      productId: product.id!,
+      productName: product.name,
+      price: product.price,
+      quantity: 0.5
+    }]);
+    
+    // Reset the form values for a new calculation
+    setDesiredPrice(0);
+    form.setValue('desiredPrice', 0);
+    setCalculatedGrams(0);
+    form.setValue('calculatedGrams', 0);
+    setActualGrams(0);
+    form.setValue('actualGrams', 0);
   };
 
-  // Actualizar cantidad de un producto en el carrito
-  const updateCartItemQuantity = (productId: number, quantity: number) => {
-    if (quantity <= 0) {
-      // Eliminar el producto si la cantidad es 0 o menos
-      setCart(prevCart => prevCart.filter(item => item.productId !== productId));
-    } else {
-      // Actualizar la cantidad
-      setCart(prevCart => 
-        prevCart.map(item => 
-          item.productId === productId 
-            ? { ...item, quantity } 
-            : item
-        )
-      );
+  // Update the desired price and calculate grams
+  const updateDesiredPrice = (value: number) => {
+    setDesiredPrice(value);
+    form.setValue('desiredPrice', value);
+    
+    if (cart.length === 1) {
+      const product = cart[0];
+      const calculatedAmount = value / product.price;
+      setCalculatedGrams(parseFloat(calculatedAmount.toFixed(2)));
+      form.setValue('calculatedGrams', parseFloat(calculatedAmount.toFixed(2)));
+      setActualGrams(parseFloat(calculatedAmount.toFixed(2)));
+      form.setValue('actualGrams', parseFloat(calculatedAmount.toFixed(2)));
     }
   };
 
-  // Eliminar producto del carrito
-  const removeFromCart = (productId: number) => {
-    setCart(prevCart => prevCart.filter(item => item.productId !== productId));
-  };
-
-  // Calcular total del carrito
-  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
-  // Calcular precio para dispensación simple
-  const calculateSinglePrice = (): number => {
-    if (!selectedProduct || !quantity) return 0;
-    return selectedProduct.price * quantity;
+  // Update the actual grams dispensed
+  const updateActualGrams = (value: number) => {
+    setActualGrams(value);
+    form.setValue('actualGrams', value);
   };
 
   // Confirmar eliminación de dispensación
@@ -310,7 +298,7 @@ const Dispensary = () => {
     }
   };
 
-  const onSubmitSingle = async (data: FormValues) => {
+  const onSubmit = async (data: FormValues) => {
     try {
       // Verificar si hay una caja abierta
       if (!currentCashRegister) {
@@ -322,10 +310,19 @@ const Dispensary = () => {
         return;
       }
 
+      // Verificar que haya un producto seleccionado
+      if (cart.length === 0) {
+        toast({
+          title: "Error",
+          description: "Seleccione un producto para dispensar",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const memberId = parseInt(data.memberId);
-      const productId = parseInt(data.productId);
-      const requestedQuantity = data.quantity;
-      const dispensedQuantity = data.actualQuantity;
+      const productId = cart[0].productId;
+      const actualGrams = data.actualGrams;
       const paymentMethod = data.paymentMethod;
       
       // Obtener el producto para verificar stock y precio
@@ -344,7 +341,7 @@ const Dispensary = () => {
       const stockGramsNum = typeof product.stockGrams === 'number' ? 
         product.stockGrams : Number(product.stockGrams) || 0;
       
-      if (stockGramsNum < dispensedQuantity) {
+      if (stockGramsNum < actualGrams) {
         toast({
           title: "Error",
           description: `No hay suficiente stock del producto seleccionado`,
@@ -354,23 +351,23 @@ const Dispensary = () => {
       }
       
       // Calcular precio total
-      const price = product.price * dispensedQuantity;
+      const price = product.price * actualGrams;
       
       // Registrar dispensación
       const dispensaryId = await db.dispensary.add({
         memberId,
         productId,
-        quantity: dispensedQuantity,
+        quantity: actualGrams,
         price,
         paymentMethod,
-        notes: `Cantidad solicitada: ${requestedQuantity}g, Cantidad dispensada: ${dispensedQuantity}g`,
+        notes: `Cantidad deseada: ${data.desiredPrice}€, Calculada: ${data.calculatedGrams}g, Dispensada: ${data.actualGrams}g`,
         userId: 1, // Admin por defecto
         createdAt: new Date()
       });
       
       // Actualizar stock del producto
       await db.products.update(productId, {
-        stockGrams: stockGramsNum - dispensedQuantity,
+        stockGrams: stockGramsNum - actualGrams,
         updatedAt: new Date()
       });
       
@@ -389,130 +386,22 @@ const Dispensary = () => {
       // Limpiar formulario y cerrar diálogo
       form.reset({
         memberId: data.memberId,
-        productId: '',
         paymentMethod: 'cash',
-        quantity: 1,
-        actualQuantity: 1
+        desiredPrice: 0,
+        calculatedGrams: 0,
+        actualGrams: 0
       });
       
-      setSelectedProductId('');
+      setCart([]);
+      setDesiredPrice(0);
+      setCalculatedGrams(0);
+      setActualGrams(0);
+      setIsAddDialogOpen(false);
       
       toast({
         title: "Dispensación registrada",
         description: "La dispensación ha sido registrada correctamente",
       });
-      
-    } catch (error) {
-      console.error("Error al registrar la dispensación:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo registrar la dispensación",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const onSubmitMultiple = async (data: FormValues) => {
-    try {
-      // Verificar si hay una caja abierta
-      if (!currentCashRegister) {
-        toast({
-          title: "Error",
-          description: "Debe abrir una caja antes de hacer dispensaciones",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Verificar que hay productos en el carrito
-      if (cart.length === 0) {
-        toast({
-          title: "Error",
-          description: "Añada productos al carrito para realizar la dispensación",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // En una aplicación real, obtendríamos el userId del contexto de autenticación
-      const userId = 1; // Usando el admin por defecto
-      
-      const memberId = parseInt(data.memberId);
-      const paymentMethod = data.paymentMethod;
-      
-      // Procesar cada producto en el carrito
-      for (const item of cart) {
-        // Obtener el producto para verificar stock
-        const product = await db.products.get(item.productId);
-        
-        if (!product) {
-          toast({
-            title: "Error",
-            description: `El producto ${item.productName} ya no existe`,
-            variant: "destructive",
-          });
-          continue;
-        }
-        
-        // Ensure stockGrams is a number
-        const stockGramsNum = typeof product.stockGrams === 'number' ? 
-          product.stockGrams : Number(product.stockGrams) || 0;
-        
-        if (stockGramsNum < item.quantity) {
-          toast({
-            title: "Error",
-            description: `No hay suficiente stock de ${item.productName}`,
-            variant: "destructive",
-          });
-          continue;
-        }
-        
-        // Calcular precio total por ítem
-        const itemPrice = item.price * item.quantity;
-        
-        // Registrar dispensación
-        await db.dispensary.add({
-          memberId,
-          productId: item.productId,
-          quantity: item.quantity,
-          price: itemPrice,
-          paymentMethod,
-          notes: `Dispensación múltiple - ${item.productName}`,
-          userId,
-          createdAt: new Date()
-        });
-        
-        // Actualizar stock del producto
-        await db.products.update(item.productId, {
-          stockGrams: stockGramsNum - item.quantity,
-          updatedAt: new Date()
-        });
-      }
-      
-      // Registrar el total como ingreso en caja
-      await db.cashTransactions.add({
-        type: 'income',
-        amount: cartTotal,
-        concept: `Dispensación múltiple`,
-        notes: `Para socio ID: ${memberId}`,
-        userId,
-        paymentMethod,
-        cashRegisterId: currentCashRegister.id,
-        createdAt: new Date()
-      });
-      
-      toast({
-        title: "Dispensación registrada",
-        description: "La dispensación múltiple ha sido registrada correctamente",
-      });
-      
-      // Limpiar carrito y cerrar diálogo
-      setCart([]);
-      setIsAddDialogOpen(false);
-      // Mantener el miembro seleccionado si vino por parámetro
-      if (preselectedMemberId) {
-        form.setValue('memberId', preselectedMemberId);
-      }
       
     } catch (error) {
       console.error("Error al registrar la dispensación:", error);
@@ -622,399 +511,229 @@ const Dispensary = () => {
           <DialogHeader>
             <DialogTitle>Nueva Dispensación</DialogTitle>
           </DialogHeader>
-          <Tabs defaultValue="single" className="mt-2" onValueChange={(value) => setDispensaryMode(value as any)}>
-            <TabsList className="grid grid-cols-2 mb-4">
-              <TabsTrigger value="single">Dispensación Simple</TabsTrigger>
-              <TabsTrigger value="multiple">Dispensación Múltiple</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="single" className="space-y-4">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmitSingle)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="memberId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Socio</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            setSelectedMemberId(value);
-                          }} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="flex items-center">
-                              <User className="mr-2 h-4 w-4" />
-                              <SelectValue placeholder="Seleccionar socio" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-80">
-                            {members?.map((member) => (
-                              <SelectItem key={member.id} value={String(member.id)}>
-                                {member.memberCode} - {member.firstName} {member.lastName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="memberId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Socio</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedMemberId(value);
+                      }} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="flex items-center">
+                          <User className="mr-2 h-4 w-4" />
+                          <SelectValue placeholder="Seleccionar socio" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-80">
+                        {members?.map((member) => (
+                          <SelectItem key={member.id} value={String(member.id)}>
+                            {member.memberCode} - {member.firstName} {member.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                  <FormField
-                    control={form.control}
-                    name="productId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Producto</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            setSelectedProductId(value);
-                          }}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="flex items-center">
-                              <Package className="mr-2 h-4 w-4" />
-                              <SelectValue placeholder="Seleccionar producto" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-80">
-                            {products?.map((product) => (
-                              <SelectItem key={product.id} value={String(product.id)}>
-                                {product.name} - {formatNumber(product.price)}€/g - Stock: {formatNumber(product.stockGrams)}g
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {selectedProduct && (
-                          <div className="text-sm text-muted-foreground mt-1">
-                            <span className="font-medium">Stock disponible:</span> {formatNumber(selectedProduct.stockGrams)}g
+              <div className="space-y-4 border rounded-md p-4">
+                <h3 className="text-lg font-medium">Selección de producto</h3>
+                <div className="relative w-full mb-4">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Buscar producto..."
+                    className="w-full pl-8"
+                    value={productSearchQuery}
+                    onChange={(e) => setProductSearchQuery(e.target.value)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {filteredProducts?.map((product) => (
+                    <Card 
+                      key={product.id} 
+                      className={`cursor-pointer hover:border-primary transition-all ${
+                        cart.length > 0 && cart[0].productId === product.id
+                          ? 'border-primary shadow-md' 
+                          : 'shadow-sm'
+                      }`}
+                      onClick={() => addToCart(product)}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex flex-col">
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatNumber(product.price)}€/g · 
+                            Stock: {formatNumber(product.stockGrams)}g
                           </div>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="quantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Cantidad a dispensar (g)</FormLabel>
-                          <FormControl>
-                            <div className="flex items-center">
-                              <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
-                              <Input 
-                                type="number" 
-                                min="0.1" 
-                                step="0.1" 
-                                value={field.value}
-                                onChange={(e) => {
-                                  const value = parseFloat(e.target.value) || 0;
-                                  field.onChange(value);
-                                  setQuantity(value);
-                                  // También actualizar la cantidad dispensada
-                                  const actualValue = form.getValues("actualQuantity") || 0;
-                                  if (actualValue < value) {
-                                    form.setValue("actualQuantity", value);
-                                    setActualQuantity(value);
-                                  }
-                                }}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="actualQuantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Cantidad real dispensada (g)</FormLabel>
-                          <FormControl>
-                            <div className="flex items-center">
-                              <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
-                              <Input 
-                                type="number" 
-                                min="0.1" 
-                                step="0.1" 
-                                value={field.value}
-                                onChange={(e) => {
-                                  const value = parseFloat(e.target.value) || 0;
-                                  field.onChange(value);
-                                  setActualQuantity(value);
-                                }}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="paymentMethod"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Método de pago</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <DollarSign className="mr-2 h-4 w-4" />
-                              <SelectValue placeholder="Seleccionar método de pago" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="cash">Efectivo</SelectItem>
-                            <SelectItem value="bizum">Bizum</SelectItem>
-                            <SelectItem value="wallet">Monedero</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-between items-center mt-4 p-4 bg-secondary/50 rounded-md">
-                    <div className="text-sm">
-                      <p className="font-medium">Precio por gramo: {selectedProduct ? formatNumber(selectedProduct.price) : '0.00'}€</p>
-                      <p className="font-medium mt-1">Cantidad: {formatNumber(actualQuantity)}g</p>
-                    </div>
-                    <div className="text-lg font-bold">
-                      Total: {formatNumber(calculateSinglePrice())}€
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <Button 
-                      type="submit" 
-                      className="bg-green-600 hover:bg-green-700"
-                      disabled={
-                        !form.watch('memberId') || 
-                        !form.watch('productId') || 
-                        !form.watch('paymentMethod') ||
-                        !currentCashRegister
-                      }
-                    >
-                      <Cannabis className="mr-2 h-4 w-4" />
-                      Completar Dispensación
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </TabsContent>
-            
-            <TabsContent value="multiple" className="space-y-4">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmitMultiple)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="memberId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Socio</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            setSelectedMemberId(value);
-                          }} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="flex items-center">
-                              <User className="mr-2 h-4 w-4" />
-                              <SelectValue placeholder="Seleccionar socio" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-80">
-                            {members?.map((member) => (
-                              <SelectItem key={member.id} value={String(member.id)}>
-                                {member.memberCode} - {member.firstName} {member.lastName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="space-y-4 border rounded-md p-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium">Selección de productos</h3>
-                      <div className="relative w-64">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="search"
-                          placeholder="Buscar producto..."
-                          className="w-full pl-8"
-                          value={productSearchQuery}
-                          onChange={(e) => setProductSearchQuery(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                      {filteredProducts?.map((product) => (
-                        <Card 
-                          key={product.id} 
-                          className={`cursor-pointer hover:border-primary transition-all ${
-                            cart.some(item => item.productId === product.id) 
-                              ? 'border-primary shadow-md' 
-                              : 'shadow-sm'
-                          }`}
-                          onClick={() => addToCart(product)}
-                        >
-                          <CardContent className="p-3">
-                            <div className="flex flex-col">
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {formatNumber(product.price)}€/g · 
-                                Stock: {formatNumber(product.stockGrams)}g
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {cart.length > 0 && (
-                      <div className="space-y-3 mt-4">
-                        <h4 className="text-sm font-medium">Carrito de dispensación</h4>
-                        <div className="rounded-md border">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Producto</TableHead>
-                                <TableHead>Precio/g</TableHead>
-                                <TableHead>Cantidad (g)</TableHead>
-                                <TableHead className="text-right">Subtotal</TableHead>
-                                <TableHead></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {cart.map((item) => (
-                                <TableRow key={item.productId}>
-                                  <TableCell>{item.productName}</TableCell>
-                                  <TableCell>{formatNumber(item.price)}€</TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center space-x-2">
-                                      <Button 
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        className="px-2 py-0 h-7 w-7"
-                                        onClick={() => updateCartItemQuantity(item.productId, item.quantity - 0.5)}
-                                      >
-                                        -
-                                      </Button>
-                                      <Input
-                                        type="number"
-                                        min="0.1"
-                                        step="0.1"
-                                        className="w-16 h-7"
-                                        value={item.quantity}
-                                        onChange={(e) => updateCartItemQuantity(
-                                          item.productId, 
-                                          parseFloat(e.target.value) || 0
-                                        )}
-                                      />
-                                      <Button 
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        className="px-2 py-0 h-7 w-7"
-                                        onClick={() => updateCartItemQuantity(item.productId, item.quantity + 0.5)}
-                                      >
-                                        +
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {formatNumber(item.price * item.quantity)}€
-                                  </TableCell>
-                                  <TableCell>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7"
-                                      onClick={() => removeFromCart(item.productId)}
-                                    >
-                                      <Trash className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                              <TableRow>
-                                <TableCell colSpan={3} className="text-right font-medium">
-                                  Total:
-                                </TableCell>
-                                <TableCell className="text-right font-bold">
-                                  {formatNumber(cartTotal)}€
-                                </TableCell>
-                                <TableCell></TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
 
+                {cart.length > 0 && (
+                  <div className="mt-4 p-4 bg-secondary/30 rounded-md">
+                    <h4 className="font-medium mb-2">Producto seleccionado: {cart[0].productName}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Precio: {formatNumber(cart[0].price)}€/g
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {cart.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
-                    name="paymentMethod"
+                    name="desiredPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Método de pago</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <DollarSign className="mr-2 h-4 w-4" />
-                              <SelectValue placeholder="Seleccionar método de pago" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="cash">Efectivo</SelectItem>
-                            <SelectItem value="bizum">Bizum</SelectItem>
-                            <SelectItem value="wallet">Monedero</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
+                        <FormLabel>Cantidad deseada (€)</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center">
+                            <Euro className="mr-2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                              type="number" 
+                              min="0"
+                              step="0.5" 
+                              value={field.value}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+                                field.onChange(value);
+                                updateDesiredPrice(value);
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Cantidad en euros que desea el socio
+                        </FormDescription>
                       </FormItem>
                     )}
                   />
-                  <DialogFooter>
-                    <Button 
-                      type="submit" 
-                      className="bg-green-600 hover:bg-green-700"
-                      disabled={
-                        !form.watch('memberId') || 
-                        !form.watch('paymentMethod') ||
-                        cart.length === 0 ||
-                        !currentCashRegister
-                      }
-                    >
-                      <Cannabis className="mr-2 h-4 w-4" />
-                      Completar Dispensación
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </TabsContent>
-          </Tabs>
+
+                  <FormField
+                    control={form.control}
+                    name="calculatedGrams"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cantidad calculada (g)</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center">
+                            <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                              type="number"
+                              readOnly
+                              value={field.value}
+                              className="bg-muted"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Gramos calculados automáticamente
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="actualGrams"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cantidad real dispensada (g)</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center">
+                            <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                              type="number" 
+                              min="0.1" 
+                              step="0.1" 
+                              value={field.value}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+                                field.onChange(value);
+                                updateActualGrams(value);
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Cantidad real dispensada en la balanza
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Método de pago</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <DollarSign className="mr-2 h-4 w-4" />
+                          <SelectValue placeholder="Seleccionar método de pago" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="cash">Efectivo</SelectItem>
+                        <SelectItem value="bizum">Bizum</SelectItem>
+                        <SelectItem value="wallet">Monedero</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {cart.length > 0 && (
+                <div className="flex justify-between items-center mt-4 p-4 bg-secondary/50 rounded-md">
+                  <div className="text-sm">
+                    <p className="font-medium">Producto: {cart[0].productName}</p>
+                    <p className="font-medium mt-1">Precio por gramo: {formatNumber(cart[0].price)}€</p>
+                    <p className="font-medium mt-1">Cantidad a dispensar: {formatNumber(actualGrams)}g</p>
+                  </div>
+                  <div className="text-lg font-bold">
+                    Total: {formatNumber(cart[0].price * actualGrams)}€
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button 
+                  type="submit" 
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={
+                    !form.watch('memberId') || 
+                    cart.length === 0 ||
+                    !form.watch('paymentMethod') ||
+                    form.watch('actualGrams') <= 0 ||
+                    !currentCashRegister
+                  }
+                >
+                  <Cannabis className="mr-2 h-4 w-4" />
+                  Completar Dispensación
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
       

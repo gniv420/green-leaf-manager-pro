@@ -28,7 +28,8 @@ import {
   CircleDollarSign, 
   Package2,
   User,
-  FileBarChart
+  FileBarChart,
+  LogOut
 } from "lucide-react";
 
 interface SidebarItem {
@@ -43,6 +44,7 @@ export const MainLayout = () => {
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const { associationName, logoPreview } = useSettings();
+  const { isOpen, setIsOpen } = useSidebar();
   
   const sidebarItems: SidebarItem[] = [
     {
@@ -102,7 +104,7 @@ export const MainLayout = () => {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full bg-background">
-        <Sidebar variant="sidebar" collapsible="icon">
+        <Sidebar variant="sidebar" collapsible>
           <SidebarHeader className="flex items-center justify-center border-b">
             <div className="flex items-center gap-2 p-2">
               {logoPreview ? (
@@ -141,9 +143,10 @@ export const MainLayout = () => {
           <SidebarFooter className="border-t">
             <Button 
               variant="outline" 
-              className="w-full justify-start gap-2" 
+              className="w-full justify-start gap-2 text-foreground hover:bg-primary hover:text-primary-foreground" 
               onClick={handleLogout}
             >
+              <LogOut className="h-4 w-4" />
               Cerrar sesión
             </Button>
           </SidebarFooter>
@@ -151,8 +154,10 @@ export const MainLayout = () => {
         
         <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
           <div className="p-2 border-b flex items-center">
-            <SidebarTrigger />
-            <h2 className="text-lg font-medium ml-2">{associationName}</h2>
+            <SidebarTrigger className="mr-2">
+              <Menu className="h-5 w-5" />
+            </SidebarTrigger>
+            <h2 className="text-lg font-medium">{associationName}</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4 md:p-6">
             <Outlet />
