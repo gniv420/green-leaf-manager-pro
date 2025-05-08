@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { db, Member, Product, Dispensary } from '@/lib/db';
@@ -111,7 +110,7 @@ const Dashboard = () => {
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-2">
           <Cannabis className="h-6 w-6 text-green-600" />
-          <span className="text-lg font-semibold">GreenLeaf Manager</span>
+          <span className="text-lg font-semibold">NivariaCSC Manager</span>
         </div>
       </div>
       

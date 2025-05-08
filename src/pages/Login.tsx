@@ -40,7 +40,7 @@ const Login = () => {
             <div className="flex justify-center">
               <Cannabis className="h-12 w-12 text-green-600" />
             </div>
-            <CardTitle className="text-2xl font-bold">GreenLeaf Manager</CardTitle>
+            <CardTitle className="text-2xl font-bold">NivariaCSC Manager</CardTitle>
             <CardDescription>
               Administración de Asociación Cannábica
             </CardDescription>
