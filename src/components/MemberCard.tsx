@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff, UserRound, Cannabis, Phone } from 'lucide-react';
 import { Member } from '@/lib/db';
+import { useTheme } from '@/hooks/use-theme';
 
 interface MemberCardProps {
   member: Member;
@@ -14,6 +15,7 @@ interface MemberCardProps {
 const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
   const navigate = useNavigate();
   const [showSensitiveInfo, setShowSensitiveInfo] = useState(false);
+  const { theme } = useTheme();
 
   const toggleSensitiveInfo = () => {
     setShowSensitiveInfo(prev => !prev);
@@ -46,7 +48,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
   };
 
   return (
-    <Card className="h-full">
+    <Card className={`h-full transition-colors ${theme === 'dark' ? 'bg-secondary/20' : ''}`}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>
@@ -85,14 +87,14 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
           </div>
           <div className="flex justify-between text-sm mt-2">
             <span className="text-muted-foreground">Saldo:</span>
-            <span className="font-medium text-green-600">{(member.balance || 0).toFixed(2)} €</span>
+            <span className="font-medium text-green-600 dark:text-green-400">{(member.balance || 0).toFixed(2)} €</span>
           </div>
         </div>
       </CardContent>
       <CardFooter className="pt-2 flex flex-col gap-2">
         <Button 
           variant="default" 
-          className="w-full bg-green-600 hover:bg-green-700"
+          className="w-full bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
           onClick={() => navigate(`/members/${member.id}`)}
         >
           <UserRound className="mr-2 h-4 w-4" />
