@@ -16,7 +16,6 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import MemberCard from '@/components/MemberCard';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 
 const Members = () => {
@@ -38,7 +37,7 @@ const Members = () => {
     try {
       let allMembers = await db.members.toArray();
       
-      // Asegurarse de que todos los socios tienen memberCode
+      // Ensure all members have memberCode
       let hasChanges = false;
       for (const member of allMembers) {
         if (!member.memberCode && member.id) {
@@ -48,7 +47,7 @@ const Members = () => {
         }
       }
       
-      // Si hubo cambios, volver a cargar
+      // Reload if changes were made
       if (hasChanges) {
         allMembers = await db.members.toArray();
       }
@@ -56,7 +55,9 @@ const Members = () => {
       allMembers.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
+      
       setMembers(allMembers);
+      console.log("Members loaded:", allMembers.length);
     } catch (error) {
       console.error('Error fetching members:', error);
       toast({

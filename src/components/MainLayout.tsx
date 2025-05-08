@@ -1,174 +1,164 @@
 
-import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from "react";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
+  Cannabis, 
   Users, 
-  User, 
-  Database, 
-  Settings,
-  Cannabis,
-  LogOut,
-  Menu,
-  X,
-  Package,
-  Coins
-} from 'lucide-react';
+  BarChart4, 
+  CreditCard, 
+  Settings, 
+  Menu, 
+  CircleDollarSign, 
+  Package2,
+  User,
+  FileBarChart
+} from "lucide-react";
+import { useMobile } from "@/hooks/use-mobile";
 
-interface SidebarItemProps {
-  to: string;
-  icon: React.ReactNode;
-  label: string;
-  isActive: boolean;
-  isSidebarOpen: boolean;
+interface SidebarItem {
+  title: string;
+  icon: React.FC<any>;
+  path: string;
+  admin?: boolean;
 }
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ 
-  to, 
-  icon, 
-  label, 
-  isActive,
-  isSidebarOpen
-}) => {
-  return (
-    <Link
-      to={to}
-      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all ${
-        isActive 
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
-          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-      }`}
-    >
-      {icon}
-      {isSidebarOpen && <span>{label}</span>}
-    </Link>
-  );
-};
-
-const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const { currentUser, logout } = useAuth();
+export const MainLayout = () => {
+  const { isMobile } = useMobile();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
-  const location = useLocation();
+  const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
+  const { currentUser, logout } = useAuth();
+  
+  useEffect(() => {
+    setShowMobileMenu(false);
+  }, [pathname]);
+
+  const sidebarItems: SidebarItem[] = [
+    {
+      title: "Dashboard",
+      icon: BarChart4,
+      path: "/dashboard",
+    },
+    {
+      title: "Socios",
+      icon: Users,
+      path: "/members",
+    },
+    {
+      title: "Dispensario",
+      icon: Cannabis,
+      path: "/dispensary",
+    },
+    {
+      title: "Caja",
+      icon: CircleDollarSign,
+      path: "/cash-register",
+    },
+    {
+      title: "Gestión de caja",
+      icon: CreditCard,
+      path: "/cash-management",
+      admin: true,
+    },
+    {
+      title: "Inventario",
+      icon: Package2,
+      path: "/inventory",
+      admin: true,
+    },
+    {
+      title: "Informes",
+      icon: FileBarChart,
+      path: "/reports",
+      admin: true,
+    },
+    {
+      title: "Usuarios",
+      icon: User,
+      path: "/users",
+      admin: true,
+    },
+    {
+      title: "Ajustes",
+      icon: Settings,
+      path: "/settings",
+      admin: true,
+    },
+  ];
+
+  const isAdmin = currentUser?.isAdmin === true;
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const filteredSidebarItems = sidebarItems.filter(item => !item.admin || isAdmin);
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside 
-        className={`fixed inset-y-0 left-0 z-20 flex h-full flex-col overflow-y-auto bg-sidebar border-r border-sidebar-border transition-all ${
-          isSidebarOpen ? 'w-64' : 'w-16'
-        }`}
-      >
-        {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-          {isSidebarOpen && (
-            <div className="flex items-center gap-2">
-              <Cannabis className="h-6 w-6 text-sidebar-foreground" />
-              <span className="text-lg font-semibold text-sidebar-foreground">
-                GreenLeaf
-              </span>
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            {isSidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+    <div className="flex h-screen bg-background">
+      {/* Mobile menu button */}
+      {isMobile && (
+        <div className="fixed top-0 left-0 z-50 p-4 bg-background">
+          <Button variant="outline" size="icon" onClick={() => setShowMobileMenu(!showMobileMenu)}>
+            <Menu className="h-4 w-4" />
           </Button>
         </div>
+      )}
 
-        {/* Navigation */}
-        <nav className="flex flex-1 flex-col gap-1 p-2">
-          <SidebarItem
-            to="/dashboard"
-            icon={<Database className="h-4 w-4" />}
-            label="Dashboard"
-            isActive={location.pathname === '/dashboard'}
-            isSidebarOpen={isSidebarOpen}
-          />
-          <SidebarItem
-            to="/members"
-            icon={<Users className="h-4 w-4" />}
-            label="Socios"
-            isActive={location.pathname.startsWith('/members')}
-            isSidebarOpen={isSidebarOpen}
-          />
-          {/* Nuevos elementos de navegación */}
-          <SidebarItem
-            to="/inventory"
-            icon={<Package className="h-4 w-4" />}
-            label="Inventario"
-            isActive={location.pathname === '/inventory'}
-            isSidebarOpen={isSidebarOpen}
-          />
-          <SidebarItem
-            to="/cash"
-            icon={<Coins className="h-4 w-4" />}
-            label="Gestión de Caja"
-            isActive={location.pathname === '/cash'}
-            isSidebarOpen={isSidebarOpen}
-          />
-          <SidebarItem
-            to="/dispensary"
-            icon={<Cannabis className="h-4 w-4" />}
-            label="Dispensario"
-            isActive={location.pathname === '/dispensary'}
-            isSidebarOpen={isSidebarOpen}
-          />
-          <SidebarItem
-            to="/users"
-            icon={<User className="h-4 w-4" />}
-            label="Usuarios"
-            isActive={location.pathname.startsWith('/users')}
-            isSidebarOpen={isSidebarOpen}
-          />
-          <SidebarItem
-            to="/settings"
-            icon={<Settings className="h-4 w-4" />}
-            label="Configuración"
-            isActive={location.pathname === '/settings'}
-            isSidebarOpen={isSidebarOpen}
-          />
-        </nav>
-
-        {/* User info and logout */}
-        <div className="border-t border-sidebar-border p-2">
-          <div className="flex items-center justify-between rounded-md bg-sidebar-accent p-2 text-sm text-sidebar-accent-foreground">
-            {isSidebarOpen && (
-              <div className="truncate">
-                <p className="font-medium">{currentUser?.username}</p>
-                <p className="text-xs opacity-80">
-                  {currentUser?.isAdmin ? 'Administrador' : 'Usuario'}
-                </p>
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={logout}
-              className="text-sidebar-accent-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+      {/* Sidebar */}
+      <div className={cn(
+        "bg-accent/50 h-screen border-r transition-all duration-300 ease-in-out",
+        isMobile 
+          ? showMobileMenu ? "fixed inset-0 z-40 w-[240px]" : "-translate-x-full fixed inset-0 z-40 w-[240px]"
+          : "w-[240px]"
+      )}>
+        <div className="p-4 h-[60px] border-b flex items-center justify-center">
+          <h1 className="text-lg font-bold">Cannabis Association</h1>
+        </div>
+        
+        <ScrollArea className="h-[calc(100vh-120px)]">
+          <div className="space-y-1 p-2">
+            {filteredSidebarItems.map((item) => {
+              const isActive = pathname === item.path;
+              return (
+                <Link to={item.path} key={item.path}>
+                  <Button
+                    variant={isActive ? "secondary" : "ghost"}
+                    className={cn("w-full justify-start gap-2", 
+                      isActive ? "bg-secondary" : ""
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.title}
+                  </Button>
+                </Link>
+              );
+            })}
           </div>
+        </ScrollArea>
+        
+        <div className="h-[60px] border-t p-2">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start" 
+            onClick={handleLogout}
+          >
+            Cerrar sesión
+          </Button>
         </div>
-      </aside>
-
+      </div>
+      
       {/* Main content */}
-      <main 
-        className={`flex-1 transition-all ${
-          isSidebarOpen ? 'ml-64' : 'ml-16'
-        }`}
-      >
-        <div className="container py-4 md:py-8">
-          {children}
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <Outlet />
         </div>
-      </main>
+      </div>
     </div>
   );
 };
-
-export default MainLayout;

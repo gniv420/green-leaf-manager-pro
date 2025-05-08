@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, CashRegister, CashTransaction } from '@/lib/db';
@@ -84,13 +85,13 @@ const CashRegisterPage = () => {
     
     return {
       cash: transactions
-        .filter(t => t.type === 'income' && (t as any).paymentMethod === 'cash')
+        .filter(t => t.type === 'income' && t.paymentMethod === 'cash')
         .reduce((sum, t) => sum + t.amount, 0),
       bizum: transactions
-        .filter(t => t.type === 'income' && (t as any).paymentMethod === 'bizum')
+        .filter(t => t.type === 'income' && t.paymentMethod === 'bizum')
         .reduce((sum, t) => sum + t.amount, 0),
       wallet: transactions
-        .filter(t => t.type === 'income' && (t as any).paymentMethod === 'wallet')
+        .filter(t => t.type === 'income' && t.paymentMethod === 'wallet')
         .reduce((sum, t) => sum + t.amount, 0)
     };
   }, [currentCashRegister?.id]);
