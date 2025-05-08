@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -10,10 +9,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
   SidebarRail,
-  useSidebar
+  useSidebar,
+  SidebarTrigger
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,8 +27,7 @@ import {
   Package2,
   User,
   FileBarChart,
-  LogOut,
-  ChevronLeft
+  LogOut
 } from "lucide-react";
 
 interface SidebarItem {
@@ -103,71 +100,69 @@ export const MainLayout = () => {
   };
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex h-screen w-full bg-background">
-        <Sidebar variant="sidebar" collapsible="icon">
-          <SidebarHeader className="flex items-center justify-center border-b">
-            <div className="flex items-center gap-2 p-2">
-              {logoPreview ? (
-                <img src={logoPreview} alt="Logo" className="h-8 w-8 object-contain" />
-              ) : (
-                <Cannabis className="h-6 w-6 text-green-600" />
-              )}
-              <span className="text-lg font-semibold truncate">{associationName}</span>
-            </div>
-          </SidebarHeader>
-          
-          <SidebarContent>
-            <ScrollArea className="h-[calc(100vh-120px)]">
-              <SidebarMenu>
-                {filteredSidebarItems.map((item) => {
-                  const isActive = pathname === item.path;
-                  return (
-                    <SidebarMenuItem key={item.path}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        tooltip={item.title}
-                      >
-                        <Link to={item.path}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </ScrollArea>
-          </SidebarContent>
-          
-          <SidebarFooter className="border-t">
-            <Button 
-              variant="outline" 
-              className="w-full justify-start gap-2 hover:bg-primary hover:text-primary-foreground bg-sidebar-accent text-white"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="font-medium">Cerrar sesión</span>
-            </Button>
-          </SidebarFooter>
-          
-          {/* Add the sidebar rail for collapsing */}
-          <SidebarRail />
-        </Sidebar>
+    <div className="flex h-screen w-full bg-background">
+      <Sidebar variant="sidebar" collapsible="icon">
+        <SidebarHeader className="flex items-center justify-center border-b">
+          <div className="flex items-center gap-2 p-2">
+            {logoPreview ? (
+              <img src={logoPreview} alt="Logo" className="h-8 w-8 object-contain" />
+            ) : (
+              <Cannabis className="h-6 w-6 text-green-600" />
+            )}
+            <span className="text-lg font-semibold truncate">{associationName}</span>
+          </div>
+        </SidebarHeader>
         
-        <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-          <div className="p-2 border-b flex items-center">
-            <SidebarTrigger className="p-2 bg-secondary hover:bg-secondary/80 rounded-md flex items-center justify-center mr-2">
-              <Menu className="h-5 w-5" />
-            </SidebarTrigger>
-            <h2 className="text-lg font-medium">{associationName}</h2>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 md:p-6">
-            <Outlet />
-          </div>
+        <SidebarContent>
+          <ScrollArea className="h-[calc(100vh-120px)]">
+            <SidebarMenu>
+              {filteredSidebarItems.map((item) => {
+                const isActive = pathname === item.path;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                    >
+                      <Link to={item.path}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </ScrollArea>
+        </SidebarContent>
+        
+        <SidebarFooter className="border-t">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-2 hover:bg-primary hover:text-primary-foreground bg-sidebar-accent text-white"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="font-medium">Cerrar sesión</span>
+          </Button>
+        </SidebarFooter>
+        
+        {/* Add the sidebar rail for collapsing */}
+        <SidebarRail />
+      </Sidebar>
+      
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        <div className="p-2 border-b flex items-center">
+          <SidebarTrigger className="p-2 bg-secondary hover:bg-secondary/80 rounded-md flex items-center justify-center mr-2">
+            <Menu className="h-5 w-5" />
+          </SidebarTrigger>
+          <h2 className="text-lg font-medium">{associationName}</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+          <Outlet />
         </div>
       </div>
-    </SidebarProvider>
+    </div>
   );
 };

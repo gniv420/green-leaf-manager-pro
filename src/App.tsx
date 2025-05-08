@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { MainLayout } from "@/components/MainLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
@@ -34,7 +35,13 @@ function App() {
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
               
-              <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <SidebarProvider defaultOpen={true}>
+                    <MainLayout />
+                  </SidebarProvider>
+                </ProtectedRoute>
+              }>
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="members" element={<Members />} />
                 <Route path="members/new" element={<MemberForm />} />
