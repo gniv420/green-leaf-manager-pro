@@ -42,11 +42,18 @@ const Dashboard = () => {
     
   const todayBalance = todayIncome - todayExpenses;
   
+  // Using the properly indexed stockGrams field
   const lowStockProducts = useLiveQuery(async () => {
-    return db.products
-      .where('stockGrams')
-      .below(50)
-      .toArray();
+    try {
+      console.log("Querying low stock products");
+      return await db.products
+        .where('stockGrams')
+        .below(50)
+        .toArray();
+    } catch (error) {
+      console.error("Error fetching low stock products:", error);
+      return [];
+    }
   });
 
   useEffect(() => {

@@ -1,4 +1,3 @@
-
 import Dexie, { Table } from 'dexie';
 
 // Define interfaces for our database tables
@@ -103,11 +102,12 @@ class CannabisDexie extends Dexie {
   constructor() {
     super('cannabisAssociationDB');
     
-    this.version(5).stores({
+    // Update version and add index for stockGrams
+    this.version(6).stores({
       users: '++id, username, createdAt',
       members: '++id, firstName, lastName, memberCode, dni, sponsorId, createdAt',
       documents: '++id, memberId, createdAt',
-      products: '++id, name, category, createdAt',
+      products: '++id, name, category, stockGrams, createdAt', // Added stockGrams index
       cashTransactions: '++id, type, cashRegisterId, createdAt',
       cashRegisters: '++id, status, openedAt, closedAt',
       dispensary: '++id, memberId, productId, createdAt',
