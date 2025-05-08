@@ -11,7 +11,9 @@ import {
   Cannabis,
   LogOut,
   Menu,
-  X
+  X,
+  Package,
+  Coins
 } from 'lucide-react';
 
 interface SidebarItemProps {
@@ -92,6 +94,28 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             icon={<Users className="h-4 w-4" />}
             label="Socios"
             isActive={location.pathname.startsWith('/members')}
+            isSidebarOpen={isSidebarOpen}
+          />
+          {/* Nuevos elementos de navegación */}
+          <SidebarItem
+            to="/inventory"
+            icon={<Package className="h-4 w-4" />}
+            label="Inventario"
+            isActive={location.pathname === '/inventory'}
+            isSidebarOpen={isSidebarOpen}
+          />
+          <SidebarItem
+            to="/cash"
+            icon={<Coins className="h-4 w-4" />}
+            label="Gestión de Caja"
+            isActive={location.pathname === '/cash'}
+            isSidebarOpen={isSidebarOpen}
+          />
+          <SidebarItem
+            to="/dispensary"
+            icon={<Cannabis className="h-4 w-4" />}
+            label="Dispensario"
+            isActive={location.pathname === '/dispensary'}
             isSidebarOpen={isSidebarOpen}
           />
           <SidebarItem
