@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +33,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
     if (onDispensary) {
       onDispensary();
     } else {
+      // Navigate with state param to ensure the member ID is passed correctly
       navigate(`/dispensary?memberId=${member.id}`);
     }
   };

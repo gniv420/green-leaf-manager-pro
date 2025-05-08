@@ -169,24 +169,33 @@ const Dispensary = () => {
     }
   });
   
-  // Actualizar el formulario si cambia el memberId preseleccionado
+  // Update this useEffect to properly check if cash register is open before opening the dialog
   useEffect(() => {
     if (preselectedMemberId) {
       form.setValue('memberId', preselectedMemberId);
       setSelectedMemberId(preselectedMemberId);
       
-      // Automatically open the dispensary dialog when a member ID is provided in URL
-      if (currentCashRegister) {
-        setIsAddDialogOpen(true);
-      } else {
-        toast({
-          variant: 'default',
-          title: 'Caja cerrada',
-          description: 'Debes abrir una caja antes de realizar dispensaciones.'
-        });
-      }
+      // Don't open the dialog immediately - wait until we have confirmed cash register status
+      const checkCashRegisterAndOpen = async () => {
+        const cashRegister = await db.cashRegisters
+          .where('status')
+          .equals('open')
+          .first();
+        
+        if (cashRegister) {
+          setIsAddDialogOpen(true);
+        } else {
+          toast({
+            variant: 'default',
+            title: 'Caja cerrada',
+            description: 'Debes abrir una caja antes de realizar dispensaciones.'
+          });
+        }
+      };
+      
+      checkCashRegisterAndOpen();
     }
-  }, [preselectedMemberId, form, currentCashRegister, toast]);
+  }, [preselectedMemberId, form, toast]);
 
   // Calculate grams based on price when cart changes or desired price changes
   useEffect(() => {
