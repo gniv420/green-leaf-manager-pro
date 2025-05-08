@@ -3,11 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { db } from '@/lib/db';
-import { Download, Database, Upload, FileDown, Palette } from 'lucide-react';
+import { Download, Database, Upload, FileDown, Palette, Image } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSettings } from '@/contexts/SettingsContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ const Settings = () => {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
   const {
@@ -33,6 +35,10 @@ const Settings = () => {
     setPrimaryColor,
     logoUrl,
     setLogoUrl,
+    logoFile,
+    setLogoFile,
+    logoPreview,
+    setLogoPreview,
     saveSettings
   } = useSettings();
 
@@ -205,10 +211,49 @@ const Settings = () => {
     }
   };
 
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      // Check if the file is an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Por favor selecciona una imagen válida'
+        });
+        return;
+      }
+      
+      setLogoFile(file);
+      
+      // Create a preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setLogoPreview(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+      
+      // Clear the URL input since we're using a file now
+      setTempLogoUrl('');
+    }
+  };
+
   const handleSaveCustomizations = () => {
     setAssociationName(tempAssociationName);
     setPrimaryColor(tempPrimaryColor);
-    setLogoUrl(tempLogoUrl);
+    
+    if (tempLogoUrl) {
+      // If URL is provided, use that
+      setLogoUrl(tempLogoUrl);
+      setLogoPreview(''); // Clear any file preview
+    } else if (logoPreview) {
+      // If we have a file preview, use that
+      setLogoUrl('');
+    }
+    
     saveSettings();
     
     toast({
@@ -380,16 +425,74 @@ const Settings = () => {
               </div>
               
               <div className="space-y-3">
-                <Label htmlFor="logoUrl">URL del logotipo (opcional)</Label>
-                <Input
-                  id="logoUrl"
-                  value={tempLogoUrl}
-                  onChange={(e) => setTempLogoUrl(e.target.value)}
-                  placeholder="https://ejemplo.com/logo.png"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Añade una URL para el logotipo de tu asociación (próximamente)
-                </p>
+                <Label>Logotipo de la asociación</Label>
+                
+                {/* Logo preview */}
+                {(logoPreview || tempLogoUrl) && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium mb-2">Vista previa:</p>
+                    <Avatar className="h-24 w-24">
+                      <AvatarImage 
+                        src={logoPreview || tempLogoUrl} 
+                        alt="Logo preview" 
+                      />
+                      <AvatarFallback>Logo</AvatarFallback>
+                    </Avatar>
+                  </div>
+                )}
+                
+                {/* File upload */}
+                <div className="space-y-2">
+                  <Label htmlFor="logoFile">Subir logo desde el dispositivo</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      id="logoFile"
+                      ref={logoFileInputRef}
+                      onChange={handleLogoFileChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <Button 
+                      onClick={() => logoFileInputRef.current?.click()}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <Image className="mr-2 h-4 w-4" />
+                      Seleccionar imagen
+                    </Button>
+                  </div>
+                  {logoFile && (
+                    <p className="text-xs text-muted-foreground">
+                      Archivo seleccionado: {logoFile.name}
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Sube un logotipo desde tu dispositivo (formatos: JPG, PNG, SVG)
+                  </p>
+                </div>
+                
+                {/* URL input as alternative */}
+                <div className="space-y-2">
+                  <Label htmlFor="logoUrl">O usar URL del logotipo (alternativo)</Label>
+                  <Input
+                    id="logoUrl"
+                    value={tempLogoUrl}
+                    onChange={(e) => {
+                      setTempLogoUrl(e.target.value);
+                      if (e.target.value) {
+                        // Clear file selection if URL is entered
+                        setLogoFile(null);
+                        setLogoPreview('');
+                        if (logoFileInputRef.current) logoFileInputRef.current.value = '';
+                      }
+                    }}
+                    placeholder="https://ejemplo.com/logo.png"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Añade una URL para el logotipo de tu asociación
+                  </p>
+                </div>
               </div>
               
               <Button 

@@ -8,6 +8,10 @@ interface SettingsContextType {
   setPrimaryColor: (color: string) => void;
   logoUrl: string;
   setLogoUrl: (url: string) => void;
+  logoFile: File | null;
+  setLogoFile: (file: File | null) => void;
+  logoPreview: string;
+  setLogoPreview: (preview: string) => void;
   saveSettings: () => void;
 }
 
@@ -15,6 +19,7 @@ const defaultSettings = {
   associationName: 'Nivaria CSC',
   primaryColor: '#15803d', // Green color
   logoUrl: '',
+  logoPreview: '',
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -23,6 +28,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [associationName, setAssociationName] = useState(defaultSettings.associationName);
   const [primaryColor, setPrimaryColor] = useState(defaultSettings.primaryColor);
   const [logoUrl, setLogoUrl] = useState(defaultSettings.logoUrl);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState(defaultSettings.logoPreview);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -32,6 +39,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setAssociationName(parsedSettings.associationName || defaultSettings.associationName);
       setPrimaryColor(parsedSettings.primaryColor || defaultSettings.primaryColor);
       setLogoUrl(parsedSettings.logoUrl || defaultSettings.logoUrl);
+      
+      // Load logo preview if available
+      if (parsedSettings.logoPreview) {
+        setLogoPreview(parsedSettings.logoPreview);
+      }
     }
   }, []);
 
@@ -40,7 +52,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const settingsToSave = {
       associationName,
       primaryColor,
-      logoUrl
+      logoUrl,
+      logoPreview
     };
     localStorage.setItem('nivaria-settings', JSON.stringify(settingsToSave));
   };
@@ -54,6 +67,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setPrimaryColor,
         logoUrl,
         setLogoUrl,
+        logoFile,
+        setLogoFile,
+        logoPreview,
+        setLogoPreview,
         saveSettings
       }}
     >
