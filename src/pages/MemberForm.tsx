@@ -40,8 +40,14 @@ const MemberForm = () => {
     memberCode: '',
     dob: new Date(),
     dni: '',
+    email: '',
     phone: '666666666', // Added default phone number
+    address: '',
+    city: '',
+    postalCode: '',
+    joinDate: new Date(),
     consumptionGrams: 0,
+    status: 'active',
     sponsorId: null,
     balance: 0,
   });
@@ -72,10 +78,16 @@ const MemberForm = () => {
             setFormData({
               firstName: member.firstName,
               lastName: member.lastName,
-              memberCode: member.memberCode,  // Added this field
+              memberCode: member.memberCode,
               dob: new Date(member.dob),
               dni: member.dni,
-              phone: member.phone,  // Added this field
+              email: member.email || '',
+              phone: member.phone,
+              address: member.address || '',
+              city: member.city || '',
+              postalCode: member.postalCode || '',
+              joinDate: member.joinDate,
+              status: member.status,
               consumptionGrams: member.consumptionGrams,
               sponsorId: member.sponsorId,
               balance: member.balance || 0,

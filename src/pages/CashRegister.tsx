@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, CashRegister, CashTransaction } from '@/lib/db';
@@ -114,6 +113,8 @@ const CashRegisterPage = () => {
       const userId = currentUser?.id || 1; // Default to admin if not set
       
       await db.cashRegisters.add({
+        openDate: new Date(),
+        initialBalance: openingAmount,
         openingAmount,
         closingAmount: null,
         userId,

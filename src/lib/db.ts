@@ -2,9 +2,9 @@
 import Dexie, { Table } from 'dexie';
 
 import { ProductType } from './product-types';
-import { Document } from './document-types';
+import { Document, DocumentType } from './document-types';
 
-export { Document } from './document-types';
+export type { Document } from './document-types';
 
 export interface User {
   id?: number;

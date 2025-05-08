@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { db, User } from '@/lib/db';
 import { Button } from '@/components/ui/button';
@@ -30,6 +29,7 @@ const Users = () => {
   const [formData, setFormData] = useState<Omit<User, 'id' | 'createdAt'>>({
     username: '',
     password: '',
+    fullName: '',
     isAdmin: false,
   });
   
@@ -76,6 +76,7 @@ const Users = () => {
     setFormData({
       username: '',
       password: '',
+      fullName: '',
       isAdmin: false,
     });
     setSelectedUser(null);
@@ -88,6 +89,7 @@ const Users = () => {
         username: user.username,
         // Don't show actual password for security reasons
         password: '',
+        fullName: user.fullName,
         isAdmin: user.isAdmin,
       });
     } else {
@@ -312,6 +314,17 @@ const Users = () => {
                 id="username"
                 name="username"
                 value={formData.username}
+                onChange={handleInputChange}
+                required
+                className="border-green-200 focus-visible:ring-green-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Nombre completo</Label>
+              <Input
+                id="fullName"
+                name="fullName"
+                value={formData.fullName}
                 onChange={handleInputChange}
                 required
                 className="border-green-200 focus-visible:ring-green-500"

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -94,7 +93,8 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
         size: file.size,
         data: buffer,
         uploadDate: new Date(),
-        notes,
+        createdAt: new Date(),
+        notes: notes || '',
       };
       
       // Guardar en la base de datos
