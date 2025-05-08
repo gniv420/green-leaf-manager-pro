@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -102,6 +101,7 @@ const Dispensary = () => {
     productId: string;
     quantity: number;
     notes: string;
+    paymentMethod: 'cash' | 'bizum' | 'wallet';
   };
 
   const form = useForm<FormValues>({
@@ -110,6 +110,7 @@ const Dispensary = () => {
       productId: '',
       quantity: 0,
       notes: '',
+      paymentMethod: 'cash'
     }
   });
   
@@ -149,6 +150,9 @@ const Dispensary = () => {
       const memberId = parseInt(data.memberId);
       const quantity = data.quantity;
       
+      // Obtain the selected payment method
+      const paymentMethod = data.paymentMethod;
+      
       // Obtener el producto para verificar stock y precio
       const product = await db.products.get(productId);
       
@@ -176,6 +180,7 @@ const Dispensary = () => {
         productId,
         quantity,
         price: product.price * quantity,
+        paymentMethod,
         notes: data.notes,
         userId,
         createdAt: new Date()
@@ -194,6 +199,7 @@ const Dispensary = () => {
         concept: `Dispensación ${product.name}`,
         notes: `Para socio ID: ${memberId}`,
         userId,
+        paymentMethod,
         cashRegisterId: currentCashRegister.id,
         createdAt: new Date()
       });
@@ -411,12 +417,35 @@ const Dispensary = () => {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Método de pago</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar método de pago" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="cash">Efectivo</SelectItem>
+                        <SelectItem value="bizum">Bizum</SelectItem>
+                        <SelectItem value="wallet">Monedero</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter>
                 <Button 
                   type="submit" 
                   disabled={
                     !form.watch('memberId') || 
                     !form.watch('productId') || 
+                    !form.watch('paymentMethod') ||
                     form.watch('quantity') <= 0 || 
                     !currentCashRegister
                   }

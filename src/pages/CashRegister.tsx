@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, CashRegister, CashTransaction } from '@/lib/db';
@@ -532,20 +531,18 @@ const CashRegisterPage = () => {
             <div className="flex gap-4">
               <Button
                 variant={transactionType === 'income' ? 'default' : 'outline'}
-                className={transactionType === 'income' ? 'bg-green-600 hover:bg-green-700' : ''}
+                className={transactionType === 'income' ? 'bg-green-600 hover:bg-green-700 flex-1' : 'flex-1'}
                 onClick={() => setTransactionType('income')}
                 type="button"
-                className="flex-1"
               >
                 <DollarSign className="mr-2 h-4 w-4" />
                 Ingreso
               </Button>
               <Button
                 variant={transactionType === 'expense' ? 'default' : 'outline'}
-                className={transactionType === 'expense' ? 'bg-red-600 hover:bg-red-700' : ''}
+                className={transactionType === 'expense' ? 'bg-red-600 hover:bg-red-700 flex-1' : 'flex-1'}
                 onClick={() => setTransactionType('expense')}
                 type="button"
-                className="flex-1"
               >
                 <Coins className="mr-2 h-4 w-4" />
                 Gasto

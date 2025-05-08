@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, UserRound, Cannabis, Plus, Minus, Phone } from 'lucide-react';
+import { Eye, EyeOff, UserRound, Cannabis, Phone } from 'lucide-react';
 import { Member } from '@/lib/db';
 
 interface MemberCardProps {
@@ -37,6 +37,13 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
     }
   };
 
+  const handlePhoneCall = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (member.phone) {
+      window.location.href = `tel:${member.phone}`;
+    }
+  };
+
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
@@ -62,7 +69,14 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Teléfono:</span>
-            <span className="font-medium">{maskedValue(member.phone || '666666666')}</span>
+            <div className="flex items-center gap-1">
+              <span className="font-medium">{maskedValue(member.phone || '666666666')}</span>
+              {showSensitiveInfo && (
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handlePhoneCall}>
+                  <Phone className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Consumo mensual:</span>

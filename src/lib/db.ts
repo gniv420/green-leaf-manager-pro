@@ -55,6 +55,7 @@ export interface CashTransaction {
   notes: string;
   userId: number; // Usuario que registra
   cashRegisterId?: number; // ID del registro de caja
+  paymentMethod: 'cash' | 'bizum' | 'wallet'; // Added payment method field
   createdAt: Date;
 }
 
@@ -89,11 +90,6 @@ export interface MemberTransaction {
   notes: string;
   userId: number; // Usuario que registra
   createdAt: Date;
-}
-
-// Added new interface for cash register transactions with payment methods
-export interface CashRegisterTransaction extends CashTransaction {
-  paymentMethod: 'cash' | 'bizum' | 'wallet';
 }
 
 // Create the database class
@@ -177,7 +173,7 @@ class CannabisDexie extends Dexie {
       // Add payment method to existing cash transactions
       const cashTransactions = await this.cashTransactions.toArray();
       for (const transaction of cashTransactions) {
-        if (transaction.id && !(transaction as CashRegisterTransaction).paymentMethod) {
+        if (transaction.id && !transaction.paymentMethod) {
           await this.cashTransactions.update(transaction.id, {
             paymentMethod: 'cash' // Default payment method
           });

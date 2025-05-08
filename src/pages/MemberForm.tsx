@@ -37,9 +37,10 @@ const MemberForm = () => {
   const [formData, setFormData] = useState<Omit<Member, 'id' | 'createdAt' | 'updatedAt'>>({
     firstName: '',
     lastName: '',
-    memberCode: '',  // Added this field
+    memberCode: '',
     dob: new Date(),
     dni: '',
+    phone: '666666666', // Added default phone number
     consumptionGrams: 0,
     sponsorId: null,
     balance: 0,
@@ -74,6 +75,7 @@ const MemberForm = () => {
               memberCode: member.memberCode,  // Added this field
               dob: new Date(member.dob),
               dni: member.dni,
+              phone: member.phone,  // Added this field
               consumptionGrams: member.consumptionGrams,
               sponsorId: member.sponsorId,
               balance: member.balance || 0,
@@ -341,6 +343,17 @@ const MemberForm = () => {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="phone">Teléfono</Label>
+                      <Input
+                        id="phone"
+                        name="phone"
+                        value={maskedValue(formData.phone)}
+                        onChange={handleInputChange}
+                        required
+                        className="border-green-200 focus-visible:ring-green-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="consumptionGrams">Previsión de Consumo (g/mes)</Label>
                       <Input
                         id="consumptionGrams"
@@ -561,6 +574,17 @@ const MemberForm = () => {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="phone">Teléfono</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    required
+                    className="border-green-200 focus-visible:ring-green-500"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="consumptionGrams">Previsión de Consumo (g/mes)</Label>
                   <Input
                     id="consumptionGrams"
@@ -572,25 +596,6 @@ const MemberForm = () => {
                     required
                     className="border-green-200 focus-visible:ring-green-500"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sponsorId">Socio Avalista</Label>
-                  <Select
-                    value={formData.sponsorId?.toString() || "null"}
-                    onValueChange={handleSponsorChange}
-                  >
-                    <SelectTrigger id="sponsorId" className="border-green-200 focus-visible:ring-green-500">
-                      <SelectValue placeholder="Seleccionar avalista" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="null">Sin avalista</SelectItem>
-                      {sponsors.map(sponsor => (
-                        <SelectItem key={sponsor.id} value={sponsor.id!.toString()}>
-                          {sponsor.firstName} {sponsor.lastName} ({sponsor.dni})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </CardContent>
