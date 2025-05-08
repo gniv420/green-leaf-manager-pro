@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -57,12 +56,6 @@ export const MainLayout = () => {
       title: "Caja",
       icon: CircleDollarSign,
       path: "/cash-register",
-    },
-    {
-      title: "Gestión de caja",
-      icon: CreditCard,
-      path: "/cash-management",
-      admin: true,
     },
     {
       title: "Inventario",
