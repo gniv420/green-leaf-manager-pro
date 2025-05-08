@@ -52,6 +52,12 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
     );
   }
 
+  // Helper function to format numbers with comma decimal separator
+  const formatNumber = (value: any): string => {
+    const num = typeof value === 'number' ? value : Number(value);
+    return isNaN(num) ? '0,00' : num.toFixed(2).replace('.', ',');
+  };
+
   // Calcular totales
   const totalDispensed = dispensaryRecords.reduce((sum, record) => sum + record.quantity, 0);
   const totalSpent = dispensaryRecords.reduce((sum, record) => sum + record.price, 0);
@@ -61,11 +67,11 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="p-4 border rounded-lg">
           <p className="text-sm text-muted-foreground">Total dispensado</p>
-          <p className="text-xl font-bold">{totalDispensed.toFixed(2)} g</p>
+          <p className="text-xl font-bold">{formatNumber(totalDispensed)} g</p>
         </div>
         <div className="p-4 border rounded-lg">
           <p className="text-sm text-muted-foreground">Total gastado</p>
-          <p className="text-xl font-bold">{totalSpent.toFixed(2)} €</p>
+          <p className="text-xl font-bold">{formatNumber(totalSpent)} €</p>
         </div>
       </div>
 
@@ -86,8 +92,8 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
                   {format(new Date(record.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
                 </TableCell>
                 <TableCell>{record.productName}</TableCell>
-                <TableCell>{record.quantity.toFixed(2)} g</TableCell>
-                <TableCell className="text-right">{record.price.toFixed(2)} €</TableCell>
+                <TableCell>{formatNumber(record.quantity)} g</TableCell>
+                <TableCell className="text-right">{formatNumber(record.price)} €</TableCell>
               </TableRow>
             ))}
           </TableBody>

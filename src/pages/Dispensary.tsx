@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -56,18 +57,12 @@ import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Separator } from '@/components/ui/separator';
+import { normalizeDecimalInput } from '@/lib/utils';
 
 // Helper function to safely format numbers
 const formatNumber = (value: any): string => {
   const num = typeof value === 'number' ? value : Number(value);
-  return isNaN(num) ? '0.00' : num.toFixed(2);
-};
-
-// Improved helper function to normalize input with comma or dot
-const normalizeDecimalInput = (value: string): number => {
-  // Replace comma with dot for calculation
-  const normalizedValue = value.replace(',', '.');
-  return parseFloat(normalizedValue) || 0;
+  return isNaN(num) ? '0,00' : num.toFixed(2).replace('.', ',');
 };
 
 // Interfaz para los items en el carrito
@@ -622,7 +617,7 @@ const Dispensary = () => {
                               type="text" 
                               inputMode="decimal"
                               decimalInput={true}
-                              value={field.value.toString()}
+                              value={field.value === 0 ? "" : field.value.toString().replace('.', ',')}
                               onChange={(e) => {
                                 let inputValue = e.target.value;
                                 
@@ -633,11 +628,11 @@ const Dispensary = () => {
                                   return;
                                 }
                                 
-                                // Normalize the input (replace comma with dot for calculation)
-                                const normalizedValue = inputValue.replace(',', '.');
-                                
                                 // Only allow valid numeric input with comma
                                 if (!/^\d*,?\d*$/.test(inputValue)) return;
+                                
+                                // Normalize the input (replace comma with dot for calculation)
+                                const normalizedValue = inputValue.replace(',', '.');
                                 
                                 // Update the field with the parsed numeric value
                                 const numValue = parseFloat(normalizedValue);
@@ -668,7 +663,7 @@ const Dispensary = () => {
                             <Input 
                               type="text"
                               readOnly
-                              value={field.value}
+                              value={field.value === 0 ? "" : field.value.toString().replace('.', ',')}
                               className="bg-muted"
                             />
                           </div>
@@ -693,7 +688,7 @@ const Dispensary = () => {
                               type="text"
                               inputMode="decimal"
                               decimalInput={true}
-                              value={field.value.toString()}
+                              value={field.value === 0 ? "" : field.value.toString().replace('.', ',')}
                               onChange={(e) => {
                                 let inputValue = e.target.value;
                                 
@@ -704,11 +699,11 @@ const Dispensary = () => {
                                   return;
                                 }
                                 
-                                // Normalize the input (replace comma with dot for calculation)
-                                const normalizedValue = inputValue.replace(',', '.');
-                                
                                 // Only allow valid numeric input with comma
                                 if (!/^\d*,?\d*$/.test(inputValue)) return;
+                                
+                                // Normalize the input for calculation
+                                const normalizedValue = inputValue.replace(',', '.');
                                 
                                 // Parse and update
                                 const numValue = parseFloat(normalizedValue);
