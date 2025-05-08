@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, Product } from '@/lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +45,7 @@ import { Switch } from '@/components/ui/switch';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Edit, Plus, Trash2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { Edit, Plus, Trash2, AlertTriangle, Eye, EyeOff, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Inventory = () => {

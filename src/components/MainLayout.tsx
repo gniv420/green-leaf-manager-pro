@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -17,7 +16,7 @@ import {
   User,
   FileBarChart
 } from "lucide-react";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SidebarItem {
   title: string;
@@ -27,7 +26,7 @@ interface SidebarItem {
 }
 
 export const MainLayout = () => {
-  const { isMobile } = useMobile();
+  const { isMobile } = useIsMobile();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
