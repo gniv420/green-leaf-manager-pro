@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useSearchParams } from 'react-router-dom';
 import { db, Dispensary as DispensaryRecord, Member, Product } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +43,9 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const Dispensary = () => {
+  const [searchParams] = useSearchParams();
+  const preselectedMemberId = searchParams.get('memberId');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -61,6 +65,7 @@ const Dispensary = () => {
           return {
             ...record,
             memberName: member ? `${member.firstName} ${member.lastName}` : 'Desconocido',
+            memberCode: member?.memberCode || '',
             productName: product ? product.name : 'Desconocido',
           };
         })
@@ -71,6 +76,7 @@ const Dispensary = () => {
         return recordsWithDetails.filter(
           record => 
             record.memberName.toLowerCase().includes(lowerQuery) || 
+            record.memberCode.toLowerCase().includes(lowerQuery) ||
             record.productName.toLowerCase().includes(lowerQuery)
         );
       }
@@ -82,6 +88,14 @@ const Dispensary = () => {
 
   const members = useLiveQuery(() => db.members.toArray());
   const products = useLiveQuery(() => db.products.toArray());
+  
+  // Obtenemos el registro de caja abierta para validar
+  const currentCashRegister = useLiveQuery(() => {
+    return db.cashRegisters
+      .where('status')
+      .equals('open')
+      .first();
+  });
 
   type FormValues = {
     memberId: string;
@@ -92,12 +106,19 @@ const Dispensary = () => {
 
   const form = useForm<FormValues>({
     defaultValues: {
-      memberId: '',
+      memberId: preselectedMemberId || '',
       productId: '',
       quantity: 0,
       notes: '',
     }
   });
+  
+  // Actualizar el formulario si cambia el memberId preseleccionado
+  useEffect(() => {
+    if (preselectedMemberId) {
+      form.setValue('memberId', preselectedMemberId);
+    }
+  }, [preselectedMemberId, form]);
 
   const watchProductId = form.watch('productId');
   
@@ -111,6 +132,16 @@ const Dispensary = () => {
 
   const onSubmit = async (data: FormValues) => {
     try {
+      // Verificar si hay una caja abierta
+      if (!currentCashRegister) {
+        toast({
+          title: "Error",
+          description: "Debe abrir una caja antes de hacer dispensaciones",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // En una aplicación real, obtendríamos el userId del contexto de autenticación
       const userId = 1; // Usando el admin por defecto
       
@@ -163,6 +194,7 @@ const Dispensary = () => {
         concept: `Dispensación ${product.name}`,
         notes: `Para socio ID: ${memberId}`,
         userId,
+        cashRegisterId: currentCashRegister.id,
         createdAt: new Date()
       });
       
@@ -173,6 +205,10 @@ const Dispensary = () => {
       
       setIsAddDialogOpen(false);
       form.reset();
+      // Mantener el miembro seleccionado si vino por parámetro
+      if (preselectedMemberId) {
+        form.setValue('memberId', preselectedMemberId);
+      }
       
     } catch (error) {
       console.error("Error al registrar la dispensación:", error);
@@ -188,11 +224,27 @@ const Dispensary = () => {
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Dispensario</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        <Button 
+          onClick={() => setIsAddDialogOpen(true)}
+          disabled={!currentCashRegister}
+        >
           <Plus className="mr-2" />
           Nueva Dispensación
         </Button>
       </div>
+
+      {!currentCashRegister && (
+        <Card className="bg-amber-50 border-amber-200">
+          <CardContent className="p-4">
+            <div className="flex items-center text-amber-800">
+              <p className="text-sm">
+                <strong>Aviso:</strong> Para realizar dispensaciones es necesario tener una caja abierta. 
+                Por favor, abra una caja primero en la sección de Gestión de Caja.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">
@@ -216,6 +268,7 @@ const Dispensary = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha</TableHead>
+                  <TableHead>Código</TableHead>
                   <TableHead>Socio</TableHead>
                   <TableHead>Producto</TableHead>
                   <TableHead>Cantidad</TableHead>
@@ -225,7 +278,7 @@ const Dispensary = () => {
               <TableBody>
                 {dispensaryRecords?.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       No hay dispensaciones registradas.
                     </TableCell>
                   </TableRow>
@@ -235,6 +288,7 @@ const Dispensary = () => {
                     <TableCell>
                       {format(record.createdAt, 'dd/MM/yyyy HH:mm', { locale: es })}
                     </TableCell>
+                    <TableCell className="font-mono">{record.memberCode}</TableCell>
                     <TableCell className="font-medium">{record.memberName}</TableCell>
                     <TableCell>{record.productName}</TableCell>
                     <TableCell>{record.quantity.toFixed(2)}g</TableCell>
@@ -269,7 +323,7 @@ const Dispensary = () => {
                       <SelectContent>
                         {members?.map((member) => (
                           <SelectItem key={member.id} value={String(member.id)}>
-                            {member.firstName} {member.lastName} - {member.dni}
+                            {member.memberCode} - {member.firstName} {member.lastName}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -360,7 +414,12 @@ const Dispensary = () => {
               <DialogFooter>
                 <Button 
                   type="submit" 
-                  disabled={!form.watch('memberId') || !form.watch('productId') || form.watch('quantity') <= 0}
+                  disabled={
+                    !form.watch('memberId') || 
+                    !form.watch('productId') || 
+                    form.watch('quantity') <= 0 || 
+                    !currentCashRegister
+                  }
                 >
                   <Cannabis className="mr-2 h-4 w-4" />
                   Registrar Dispensación

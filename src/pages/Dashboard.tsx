@@ -1,15 +1,53 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { db, Member } from '@/lib/db';
+import { db, Member, CashRegister, Product } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, User, Database, Cannabis } from 'lucide-react';
+import { Users, User, Database, Cannabis, CashRegister as CashRegisterIcon, BarChart, DollarSign, Coins } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { Button } from '@/components/ui/button';
 
 const Dashboard = () => {
   const [totalMembers, setTotalMembers] = useState<number>(0);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [recentMembers, setRecentMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const currentCashRegister = useLiveQuery(() => {
+    return db.cashRegisters
+      .where('status')
+      .equals('open')
+      .first();
+  });
+  
+  const todayTransactions = useLiveQuery(async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const transactions = await db.cashTransactions
+      .where('createdAt')
+      .aboveOrEqual(today)
+      .toArray();
+    
+    return transactions;
+  });
+  
+  const todayIncome = todayTransactions
+    ?.filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0) || 0;
+    
+  const todayExpenses = todayTransactions
+    ?.filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0) || 0;
+    
+  const todayBalance = todayIncome - todayExpenses;
+  
+  const lowStockProducts = useLiveQuery(async () => {
+    return db.products
+      .where('stockGrams')
+      .below(50)
+      .toArray();
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,7 +94,44 @@ const Dashboard = () => {
         </div>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Estado de Caja */}
+      <Card className={currentCashRegister ? 'border-green-500' : 'border-amber-500'}>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <CashRegisterIcon className={currentCashRegister ? 'text-green-500' : 'text-amber-500'} />
+            Estado de Caja
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {currentCashRegister ? (
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-muted-foreground">Caja abierta desde:</p>
+                <p className="font-medium">{new Date(currentCashRegister.openedAt).toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground mt-2">Importe inicial:</p>
+                <p className="font-bold">{currentCashRegister.openingAmount.toFixed(2)}€</p>
+              </div>
+              <Button asChild>
+                <Link to="/cash-register">
+                  Ver detalles
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-between items-center">
+              <p className="text-amber-700">No hay caja abierta actualmente</p>
+              <Button asChild>
+                <Link to="/cash-register">
+                  Abrir Caja
+                </Link>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Métricas clave */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Socios</CardTitle>
@@ -72,32 +147,48 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Ingresos hoy</CardTitle>
+            <DollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}</div>
+            <div className="text-2xl font-bold text-green-600">{todayIncome.toFixed(2)}€</div>
             <p className="text-xs text-muted-foreground">
-              Usuarios con acceso al sistema
+              Total de ingresos del día
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Gastos hoy</CardTitle>
+            <Coins className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{todayExpenses.toFixed(2)}€</div>
+            <p className="text-xs text-muted-foreground">
+              Total de gastos del día
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Base de datos</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Balance hoy</CardTitle>
+            <BarChart className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">SQLite</div>
+            <div className={`text-2xl font-bold ${todayBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {todayBalance.toFixed(2)}€
+            </div>
             <p className="text-xs text-muted-foreground">
-              Sistema de almacenamiento local
+              Balance neto del día
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-1">
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Socios recientes */}
         <Card>
           <CardHeader>
             <CardTitle>Socios recientes</CardTitle>
@@ -119,7 +210,7 @@ const Dashboard = () => {
                         {member.firstName} {member.lastName}
                       </p>
                       <div className="text-sm text-muted-foreground">
-                        DNI: {member.dni}
+                        <span className="font-mono">{member.memberCode}</span> - DNI: {member.dni}
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground">
@@ -131,6 +222,47 @@ const Dashboard = () => {
             ) : (
               <p className="py-6 text-center text-muted-foreground">
                 No hay socios registrados todavía
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Productos con bajo stock */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Productos con bajo stock</CardTitle>
+            <CardDescription>
+              Productos con menos de 50g en inventario
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {lowStockProducts && lowStockProducts.length > 0 ? (
+              <div className="space-y-2">
+                {lowStockProducts.map((product) => (
+                  <Link
+                    key={product.id}
+                    to="/inventory"
+                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted"
+                  >
+                    <div className="grid gap-1">
+                      <p className="font-medium">
+                        {product.name}
+                      </p>
+                      <div className="text-sm text-muted-foreground">
+                        {product.category}
+                      </div>
+                    </div>
+                    <div className={`text-sm font-medium ${
+                      product.stockGrams < 10 ? 'text-red-600' : 'text-amber-600'
+                    }`}>
+                      {product.stockGrams.toFixed(2)}g
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="py-6 text-center text-muted-foreground">
+                No hay productos con bajo stock
               </p>
             )}
           </CardContent>

@@ -3,14 +3,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, UserRound } from 'lucide-react';
+import { Eye, EyeOff, UserRound, Cannabis, Plus, Minus } from 'lucide-react';
 import { Member } from '@/lib/db';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 
 interface MemberCardProps {
   member: Member;
+  onDispensary?: () => void;
 }
 
-const MemberCard: React.FC<MemberCardProps> = ({ member }) => {
+const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
   const navigate = useNavigate();
   const [showSensitiveInfo, setShowSensitiveInfo] = useState(false);
 
@@ -26,11 +28,24 @@ const MemberCard: React.FC<MemberCardProps> = ({ member }) => {
     return value;
   };
 
+  // Función para navegar a la página de dispensario preseleccionando el socio
+  const handleDispensaryClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDispensary) {
+      onDispensary();
+    } else {
+      navigate(`/dispensary?memberId=${member.id}`);
+    }
+  };
+
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
-          <CardTitle className="text-xl">{member.firstName} {member.lastName}</CardTitle>
+          <div>
+            <CardTitle className="text-xl">{member.firstName} {member.lastName}</CardTitle>
+            <p className="text-sm font-mono text-muted-foreground">{member.memberCode}</p>
+          </div>
           <Button size="icon" variant="ghost" onClick={toggleSensitiveInfo}>
             {showSensitiveInfo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
@@ -56,14 +71,22 @@ const MemberCard: React.FC<MemberCardProps> = ({ member }) => {
           </div>
         </div>
       </CardContent>
-      <CardFooter className="pt-2">
+      <CardFooter className="pt-2 flex gap-2">
         <Button 
           variant="default" 
-          className="w-full bg-green-600 hover:bg-green-700"
+          className="flex-1 bg-green-600 hover:bg-green-700"
           onClick={() => navigate(`/members/${member.id}`)}
         >
           <UserRound className="mr-2 h-4 w-4" />
-          Ver detalles
+          Detalles
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={handleDispensaryClick}
+        >
+          <Cannabis className="mr-2 h-4 w-4" />
+          Dispensar
         </Button>
       </CardFooter>
     </Card>

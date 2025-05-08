@@ -5,7 +5,7 @@ import { db, Member } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Search, Plus, Trash2, Grid, List } from 'lucide-react';
+import { Pencil, Search, Plus, Trash2, Grid, List, Cannabis } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -17,8 +17,10 @@ import {
 } from '@/components/ui/dialog';
 import MemberCard from '@/components/MemberCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useNavigate } from 'react-router-dom';
 
 const Members = () => {
+  const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,6 +37,22 @@ const Members = () => {
     setIsLoading(true);
     try {
       let allMembers = await db.members.toArray();
+      
+      // Asegurarse de que todos los socios tienen memberCode
+      let hasChanges = false;
+      for (const member of allMembers) {
+        if (!member.memberCode && member.id) {
+          const code = await db.generateMemberCode(member.firstName, member.lastName);
+          await db.members.update(member.id, { memberCode: code });
+          hasChanges = true;
+        }
+      }
+      
+      // Si hubo cambios, volver a cargar
+      if (hasChanges) {
+        allMembers = await db.members.toArray();
+      }
+      
       allMembers.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
@@ -85,13 +103,20 @@ const Members = () => {
     setMemberToDelete(id);
     setDeleteDialogOpen(true);
   };
+  
+  const handleDispensaryForMember = (memberId?: number) => {
+    if (memberId) {
+      navigate(`/dispensary?memberId=${memberId}`);
+    }
+  };
 
   const filteredMembers = members.filter(member => {
     const searchTermLower = searchTerm.toLowerCase();
     return (
       member.firstName.toLowerCase().includes(searchTermLower) ||
       member.lastName.toLowerCase().includes(searchTermLower) ||
-      member.dni.toLowerCase().includes(searchTermLower)
+      member.dni.toLowerCase().includes(searchTermLower) ||
+      (member.memberCode && member.memberCode.toLowerCase().includes(searchTermLower))
     );
   });
 
@@ -111,7 +136,7 @@ const Members = () => {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, apellido o DNI..."
+            placeholder="Buscar por nombre, apellido, código o DNI..."
             className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -146,6 +171,7 @@ const Members = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Código</TableHead>
                     <TableHead>DNI</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Apellidos</TableHead>
@@ -159,6 +185,7 @@ const Members = () => {
                   {filteredMembers.length > 0 ? (
                     filteredMembers.map((member) => (
                       <TableRow key={member.id}>
+                        <TableCell className="font-mono">{member.memberCode}</TableCell>
                         <TableCell>{member.dni}</TableCell>
                         <TableCell>{member.firstName}</TableCell>
                         <TableCell>{member.lastName}</TableCell>
@@ -180,6 +207,13 @@ const Members = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleDispensaryForMember(member.id)}
+                          >
+                            <Cannabis className="h-4 w-4 text-green-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => confirmDelete(member.id)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -189,7 +223,7 @@ const Members = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-24 text-center">
+                      <TableCell colSpan={8} className="h-24 text-center">
                         {searchTerm
                           ? 'No se encontraron socios que coincidan con la búsqueda'
                           : 'No hay socios registrados'}
@@ -205,7 +239,11 @@ const Members = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredMembers.length > 0 ? (
                 filteredMembers.map((member) => (
-                  <MemberCard key={member.id} member={member} />
+                  <MemberCard 
+                    key={member.id} 
+                    member={member} 
+                    onDispensary={() => handleDispensaryForMember(member.id)} 
+                  />
                 ))
               ) : (
                 <div className="col-span-full text-center p-8 border rounded-md">
