@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { db, Member, CashRegister, Product } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, User, Database, Cannabis, CashRegister as CashRegisterIcon, BarChart, DollarSign, Coins } from 'lucide-react';
+import { Users, User, Database, Cannabis, CircleDollarSign, BarChart, DollarSign, Coins } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button } from '@/components/ui/button';
 
@@ -98,7 +98,7 @@ const Dashboard = () => {
       <Card className={currentCashRegister ? 'border-green-500' : 'border-amber-500'}>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
-            <CashRegisterIcon className={currentCashRegister ? 'text-green-500' : 'text-amber-500'} />
+            <CircleDollarSign className={currentCashRegister ? 'text-green-500' : 'text-amber-500'} />
             Estado de Caja
           </CardTitle>
         </CardHeader>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { db, Member, MemberTransaction } from '@/lib/db';
@@ -27,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
 
 const MemberForm = () => {
   const { id } = useParams();
@@ -37,6 +37,7 @@ const MemberForm = () => {
   const [formData, setFormData] = useState<Omit<Member, 'id' | 'createdAt' | 'updatedAt'>>({
     firstName: '',
     lastName: '',
+    memberCode: '',  // Added this field
     dob: new Date(),
     dni: '',
     consumptionGrams: 0,
@@ -70,6 +71,7 @@ const MemberForm = () => {
             setFormData({
               firstName: member.firstName,
               lastName: member.lastName,
+              memberCode: member.memberCode,  // Added this field
               dob: new Date(member.dob),
               dni: member.dni,
               consumptionGrams: member.consumptionGrams,
@@ -151,8 +153,12 @@ const MemberForm = () => {
         });
       } else {
         // Create new member
+        // Generate a member code for new members
+        const memberCode = await db.generateMemberCode(formData.firstName, formData.lastName);
+        
         await db.members.add({
           ...formData,
+          memberCode,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

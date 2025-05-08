@@ -25,7 +25,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CashRegister as CashRegisterIcon } from 'lucide-react';
+import { CircleDollarSign } from 'lucide-react';
 
 const CashRegisterPage = () => {
   const { toast } = useToast();
@@ -141,12 +141,12 @@ const CashRegisterPage = () => {
         <h1 className="text-3xl font-bold tracking-tight">Gestión de Caja</h1>
         {!currentCashRegister ? (
           <Button onClick={() => setIsOpenDialogOpen(true)}>
-            <CashRegisterIcon className="mr-2 h-4 w-4" />
+            <CircleDollarSign className="mr-2 h-4 w-4" />
             Abrir Caja
           </Button>
         ) : (
           <Button onClick={() => setIsCloseDialogOpen(true)} variant="destructive">
-            <CashRegisterIcon className="mr-2 h-4 w-4" />
+            <CircleDollarSign className="mr-2 h-4 w-4" />
             Cerrar Caja
           </Button>
         )}
