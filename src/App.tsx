@@ -14,6 +14,9 @@ import MemberForm from "./pages/MemberForm";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Inventory from "./pages/Inventory";
+import CashManagement from "./pages/CashManagement";
+import Dispensary from "./pages/Dispensary";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +81,37 @@ const App = () => (
                 <ProtectedRoute>
                   <MainLayout>
                     <Settings />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+            {/* Nuevas rutas */}
+            <Route
+              path="/inventory"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Inventory />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cash"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <CashManagement />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dispensary"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Dispensary />
                   </MainLayout>
                 </ProtectedRoute>
               }
