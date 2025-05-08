@@ -1,4 +1,3 @@
-
 import Dexie, { Table } from 'dexie';
 
 // Define interfaces for our database tables
@@ -167,9 +166,8 @@ CREATE TABLE IF NOT EXISTS products (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   category TEXT NOT NULL,
-  thcPercentage REAL NOT NULL,
-  cbdPercentage REAL NOT NULL,
   description TEXT NOT NULL,
+  costPrice REAL NOT NULL,
   price REAL NOT NULL,
   stockGrams REAL NOT NULL,
   createdAt TEXT NOT NULL,
@@ -226,8 +224,8 @@ CREATE TABLE IF NOT EXISTS dispensary (
 
     // Insert products data
     products.forEach(product => {
-      sqlScript += `INSERT INTO products (name, category, thcPercentage, cbdPercentage, description, price, stockGrams, createdAt, updatedAt) 
-                   VALUES ('${product.name}', '${product.category}', ${product.thcPercentage}, ${product.cbdPercentage}, '${product.description.replace(/'/g, "''")}', ${product.price}, ${product.stockGrams}, '${product.createdAt.toISOString()}', '${product.updatedAt.toISOString()}');\n`;
+      sqlScript += `INSERT INTO products (name, category, description, costPrice, price, stockGrams, createdAt, updatedAt) 
+                   VALUES ('${product.name}', '${product.category}', '${product.description.replace(/'/g, "''")}', ${product.costPrice}, ${product.price}, ${product.stockGrams}, '${product.createdAt.toISOString()}', '${product.updatedAt.toISOString()}');\n`;
     });
 
     // Insert cashTransactions data
