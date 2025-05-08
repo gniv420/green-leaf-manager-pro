@@ -14,8 +14,18 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       if (!decimalInput) return;
       
       // Allow decimal points (both period and comma)
-      const allowedKeys = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", ","];
+      const allowedKeys = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", ",", "-"];
       const controlKeys = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter", "Home", "End"];
+      
+      // Check if we already have a decimal separator in the value
+      const currentValue = e.currentTarget.value;
+      const hasDecimalSeparator = currentValue.includes('.') || currentValue.includes(',');
+      
+      // Do not allow multiple decimal separators
+      if ((e.key === '.' || e.key === ',') && hasDecimalSeparator) {
+        e.preventDefault();
+        return;
+      }
       
       // Allow control keys, numbers and decimal points
       if (!allowedKeys.includes(e.key) && !controlKeys.includes(e.key) && !e.ctrlKey && !e.metaKey) {

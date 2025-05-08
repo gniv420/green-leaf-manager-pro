@@ -584,11 +584,11 @@ const Dispensary = () => {
                     >
                       <CardContent className="p-2">
                         <div className="flex flex-col">
-                          <div className="font-medium text-sm">{product.name}</div>
+                          <div className="font-medium text-sm truncate">{product.name}</div>
                           <div className="text-sm text-muted-foreground mt-1">
                             {formatNumber(product.price)}€/g
                           </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
+                          <div className="text-xs text-muted-foreground">
                             Stock: {formatNumber(product.stockGrams)}g
                           </div>
                         </div>
@@ -633,10 +633,10 @@ const Dispensary = () => {
                                   return;
                                 }
                                 
-                                // Normalize the input (replace comma with dot)
+                                // Normalize the input (replace comma with dot for calculation)
                                 const normalizedValue = inputValue.replace(',', '.');
                                 
-                                // Only allow valid numeric input
+                                // Only allow valid numeric input with decimal point
                                 if (!/^\d*\.?\d*$/.test(normalizedValue)) return;
                                 
                                 // Update the field with the parsed numeric value
@@ -704,10 +704,10 @@ const Dispensary = () => {
                                   return;
                                 }
                                 
-                                // Normalize the input (replace comma with dot)
+                                // Normalize the input (replace comma with dot for calculation)
                                 const normalizedValue = inputValue.replace(',', '.');
                                 
-                                // Only allow valid numeric input
+                                // Only allow valid numeric input with decimal point
                                 if (!/^\d*\.?\d*$/.test(normalizedValue)) return;
                                 
                                 // Parse and update
