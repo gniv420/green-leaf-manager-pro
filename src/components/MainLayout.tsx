@@ -45,6 +45,7 @@ export const MainLayout = () => {
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const { associationName, logoPreview } = useSettings();
+  const { toggleSidebar } = useSidebar();
   
   const sidebarItems: SidebarItem[] = [
     {
@@ -157,7 +158,7 @@ export const MainLayout = () => {
         
         <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
           <div className="p-2 border-b flex items-center">
-            <SidebarTrigger className="mr-2">
+            <SidebarTrigger className="p-2 bg-secondary hover:bg-secondary/80 rounded-md flex items-center justify-center mr-2">
               <Menu className="h-5 w-5" />
             </SidebarTrigger>
             <h2 className="text-lg font-medium">{associationName}</h2>
