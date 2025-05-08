@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -149,27 +150,11 @@
   @apply opacity-0;
 }
 
-/* Make sure the sidebar rail is visible */
-[data-sidebar="rail"] {
-  @apply cursor-pointer opacity-100 hover:after:bg-sidebar-accent z-40;
-  position: absolute;
-  width: 10px !important;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-right: 2px solid hsl(var(--sidebar-border));
-}
-
-/* Add a visible indication for the sidebar rail */
-[data-sidebar="rail"]::after {
-  @apply opacity-100;
-  background-color: hsl(var(--sidebar-accent)) !important;
-}
-
 /* Improve sidebar trigger visibility */
 [data-sidebar="trigger"] {
   @apply hover:bg-accent hover:text-accent-foreground;
   padding: 0.5rem;
   border-radius: 0.25rem;
-  background-color: rgba(0, 0, 0, 0.05);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;

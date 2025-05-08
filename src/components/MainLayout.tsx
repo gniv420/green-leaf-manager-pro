@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -9,9 +10,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  SidebarTrigger,
   useSidebar,
-  SidebarTrigger
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -110,6 +110,9 @@ export const MainLayout = () => {
               <Cannabis className="h-6 w-6 text-green-600" />
             )}
             <span className="text-lg font-semibold truncate">{associationName}</span>
+            <SidebarTrigger className="ml-auto p-1 bg-sidebar-accent hover:bg-sidebar-accent/80 rounded-md flex items-center justify-center">
+              <Menu className="h-4 w-4" />
+            </SidebarTrigger>
           </div>
         </SidebarHeader>
         
@@ -147,16 +150,10 @@ export const MainLayout = () => {
             <span className="font-medium">Cerrar sesión</span>
           </Button>
         </SidebarFooter>
-        
-        {/* Add the sidebar rail for collapsing */}
-        <SidebarRail />
       </Sidebar>
       
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <div className="p-2 border-b flex items-center">
-          <SidebarTrigger className="p-2 bg-secondary hover:bg-secondary/80 rounded-md flex items-center justify-center mr-2">
-            <Menu className="h-5 w-5" />
-          </SidebarTrigger>
           <h2 className="text-lg font-medium">{associationName}</h2>
         </div>
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
