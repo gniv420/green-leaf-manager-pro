@@ -25,7 +25,7 @@ const Members = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid'); // Cambiado a grid por defecto
   const { toast } = useToast();
 
   useEffect(() => {
@@ -130,6 +130,10 @@ const Members = () => {
     }
   };
 
+  useEffect(() => {
+    fetchMembers();
+  }, []);
+
   const filteredMembers = members.filter(member => {
     const searchTermLower = searchTerm.toLowerCase();
     return (
@@ -187,7 +191,7 @@ const Members = () => {
       ) : (
         <>
           {viewMode === 'list' && (
-            <div className="rounded-md border">
+            <div className="rounded-md border shadow-sm">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -256,7 +260,7 @@ const Members = () => {
           )}
 
           {viewMode === 'grid' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredMembers.length > 0 ? (
                 filteredMembers.map((member) => (
                   <MemberCard 
@@ -266,7 +270,7 @@ const Members = () => {
                   />
                 ))
               ) : (
-                <div className="col-span-full text-center p-8 border rounded-md">
+                <div className="col-span-full text-center p-8 border rounded-md shadow-sm">
                   {searchTerm
                     ? 'No se encontraron socios que coincidan con la búsqueda'
                     : 'No hay socios registrados'}

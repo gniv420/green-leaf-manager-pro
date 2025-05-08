@@ -2,6 +2,18 @@
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar
+} from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +30,6 @@ import {
   User,
   FileBarChart
 } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SidebarItem {
   title: string;
@@ -28,17 +39,11 @@ interface SidebarItem {
 }
 
 export const MainLayout = () => {
-  const isMobile = useIsMobile();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
   const { currentUser, logout } = useAuth();
-  const { associationName } = useSettings();
+  const { associationName, logoPreview } = useSettings();
   
-  useEffect(() => {
-    setShowMobileMenu(false);
-  }, [pathname]);
-
   const sidebarItems: SidebarItem[] = [
     {
       title: "Dashboard",
@@ -87,74 +92,73 @@ export const MainLayout = () => {
   ];
 
   const isAdmin = currentUser?.isAdmin === true;
+  const filteredSidebarItems = sidebarItems.filter(item => !item.admin || isAdmin);
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  const filteredSidebarItems = sidebarItems.filter(item => !item.admin || isAdmin);
-
   return (
-    <div className="flex h-screen bg-background">
-      {/* Mobile menu button */}
-      {isMobile && (
-        <div className="fixed top-0 left-0 z-50 p-4 bg-background">
-          <Button variant="outline" size="icon" onClick={() => setShowMobileMenu(!showMobileMenu)}>
-            <Menu className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      {/* Sidebar */}
-      <div className={cn(
-        "bg-accent/50 h-screen border-r transition-all duration-300 ease-in-out",
-        isMobile 
-          ? showMobileMenu ? "fixed inset-0 z-40 w-[240px]" : "-translate-x-full fixed inset-0 z-40 w-[240px]"
-          : "w-[240px]"
-      )}>
-        <div className="p-4 h-[60px] border-b flex items-center justify-center">
-          <h1 className="text-lg font-bold">{associationName}</h1>
-        </div>
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex h-screen w-full bg-background">
+        <Sidebar variant="sidebar" collapsible="icon">
+          <SidebarHeader className="flex items-center justify-center border-b">
+            <div className="flex items-center gap-2 p-2">
+              {logoPreview ? (
+                <img src={logoPreview} alt="Logo" className="h-8 w-8 object-contain" />
+              ) : (
+                <Cannabis className="h-6 w-6 text-green-600" />
+              )}
+              <span className="text-lg font-semibold truncate">{associationName}</span>
+            </div>
+          </SidebarHeader>
+          
+          <SidebarContent>
+            <ScrollArea className="h-[calc(100vh-120px)]">
+              <SidebarMenu>
+                {filteredSidebarItems.map((item) => {
+                  const isActive = pathname === item.path;
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.title}
+                      >
+                        <Link to={item.path}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </ScrollArea>
+          </SidebarContent>
+          
+          <SidebarFooter className="border-t">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-2" 
+              onClick={handleLogout}
+            >
+              Cerrar sesión
+            </Button>
+          </SidebarFooter>
+        </Sidebar>
         
-        <ScrollArea className="h-[calc(100vh-120px)]">
-          <div className="space-y-1 p-2">
-            {filteredSidebarItems.map((item) => {
-              const isActive = pathname === item.path;
-              return (
-                <Link to={item.path} key={item.path}>
-                  <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={cn("w-full justify-start gap-2", 
-                      isActive ? "bg-secondary" : ""
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.title}
-                  </Button>
-                </Link>
-              );
-            })}
+        <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+          <div className="p-2 border-b flex items-center">
+            <SidebarTrigger />
+            <h2 className="text-lg font-medium ml-2">{associationName}</h2>
           </div>
-        </ScrollArea>
-        
-        <div className="h-[60px] border-t p-2">
-          <Button 
-            variant="outline" 
-            className="w-full justify-start" 
-            onClick={handleLogout}
-          >
-            Cerrar sesión
-          </Button>
+          <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            <Outlet />
+          </div>
         </div>
       </div>
-      
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <Outlet />
-        </div>
-      </div>
-    </div>
+    </SidebarProvider>
   );
 };
