@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useRef } from 'react';
-import { db, Document } from '@/lib/db';
+import { db, Document as DBDocument } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,7 +20,7 @@ interface DocumentsSectionProps {
 }
 
 const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DBDocument[]>([]);
   const [newDocumentName, setNewDocumentName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -138,15 +137,15 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
     });
   };
 
-  const handleDownload = (document: Document) => {
+  const handleDownload = (doc: DBDocument) => {
     try {
-      const link = document.data;
-      const a = document.createElement('a');
+      const link = doc.data;
+      const a = window.document.createElement('a');
       a.href = link;
-      a.download = document.name;
-      document.body.appendChild(a);
+      a.download = doc.name;
+      window.document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      window.document.body.removeChild(a);
       toast({
         title: 'Descarga iniciada',
         description: 'El documento se está descargando'
