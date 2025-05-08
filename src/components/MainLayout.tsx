@@ -44,7 +44,7 @@ export const MainLayout = () => {
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const { associationName, logoPreview } = useSettings();
-  const { isOpen, setIsOpen } = useSidebar();
+  const { open, setOpen } = useSidebar(); // Changed from isOpen/setIsOpen to open/setOpen
   
   const sidebarItems: SidebarItem[] = [
     {
@@ -104,7 +104,7 @@ export const MainLayout = () => {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full bg-background">
-        <Sidebar variant="sidebar" collapsible>
+        <Sidebar variant="sidebar" collapsible="icon"> {/* Changed from boolean to string enum */}
           <SidebarHeader className="flex items-center justify-center border-b">
             <div className="flex items-center gap-2 p-2">
               {logoPreview ? (
@@ -147,7 +147,7 @@ export const MainLayout = () => {
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4" />
-              Cerrar sesión
+              <span className="text-foreground">Cerrar sesión</span>
             </Button>
           </SidebarFooter>
         </Sidebar>
