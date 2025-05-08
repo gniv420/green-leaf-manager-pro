@@ -42,7 +42,7 @@ export const MainLayout = () => {
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const { associationName, logoPreview } = useSettings();
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, state } = useSidebar();
   
   const sidebarItems: SidebarItem[] = [
     {
@@ -143,7 +143,7 @@ export const MainLayout = () => {
         <SidebarFooter className="border-t">
           <Button 
             variant="outline" 
-            className="w-full justify-start gap-2 hover:bg-primary hover:text-primary-foreground bg-sidebar-accent text-white"
+            className="w-full justify-start gap-2 hover:bg-primary hover:text-primary-foreground bg-sidebar-accent text-white group-data-[collapsible=icon]:justify-center"
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4" />
@@ -154,6 +154,11 @@ export const MainLayout = () => {
       
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <div className="p-2 border-b flex items-center">
+          {state === "collapsed" && (
+            <SidebarTrigger className="mr-2 p-1 bg-sidebar-accent hover:bg-sidebar-accent/80 rounded-md flex items-center justify-center">
+              <Menu className="h-4 w-4" />
+            </SidebarTrigger>
+          )}
           <h2 className="text-lg font-medium">{associationName}</h2>
         </div>
         <div className="flex-1 overflow-y-auto p-4 md:p-6">

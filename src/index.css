@@ -145,9 +145,14 @@
   @apply text-white font-medium;
 }
 
-/* Make logout button more visible in collapsed state */
+/* Make logout button icon centered when sidebar is collapsed */
 [data-sidebar] [data-state="collapsed"] button[data-sidebar="menu-button"] span {
   @apply opacity-0;
+}
+
+/* Center the logout button icon when collapsed */
+[data-state="collapsed"] button.bg-sidebar-accent {
+  @apply justify-center;
 }
 
 /* Improve sidebar trigger visibility */
