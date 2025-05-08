@@ -619,9 +619,9 @@ const Dispensary = () => {
                             <Input 
                               type="text" 
                               inputMode="decimal"
+                              decimalInput={true}
                               value={field.value.toString()}
                               onChange={(e) => {
-                                // Fixed decimal input handling for both . and ,
                                 let inputValue = e.target.value;
                                 
                                 // Allow empty input (will be converted to 0)
@@ -631,12 +631,11 @@ const Dispensary = () => {
                                   return;
                                 }
                                 
-                                // Only allow valid numeric input with single decimal separator
-                                const validInput = /^\d*[.,]?\d*$/.test(inputValue);
-                                if (!validInput) return;
-                                
-                                // Convert comma to dot for calculation
+                                // Normalize the input (replace comma with dot)
                                 const normalizedValue = inputValue.replace(',', '.');
+                                
+                                // Only allow valid numeric input
+                                if (!/^\d*\.?\d*$/.test(normalizedValue)) return;
                                 
                                 // Update the field with the parsed numeric value
                                 const numValue = parseFloat(normalizedValue);
@@ -689,38 +688,31 @@ const Dispensary = () => {
                           <div className="flex items-center">
                             <Scale className="mr-2 h-4 w-4 text-muted-foreground" />
                             <Input 
-                              type="text" 
+                              type="text"
                               inputMode="decimal"
-                              value={field.value}
+                              decimalInput={true}
+                              value={field.value.toString()}
                               onChange={(e) => {
-                                // Fixed decimal input handling
-                                // Allow both period and comma as decimal separators
                                 let inputValue = e.target.value;
-                                // This ensures we accept both . and , as decimal separators
-                                inputValue = inputValue.replace(',', '.');
-                                // Parse the value, defaulting to 0 if NaN
-                                const value = parseFloat(inputValue) || 0;
-                                field.onChange(value);
-                                updateActualGrams(value);
-                              }}
-                              onKeyPress={(e) => {
-                                // Allow numbers, one decimal point (either . or ,)
-                                const allowedChars = /[0-9.,]/;
-                                const currentValue = e.currentTarget.value;
-                                const key = e.key;
                                 
-                                // Reject if not an allowed character
-                                if (!allowedChars.test(key)) {
-                                  e.preventDefault();
+                                // Allow empty input
+                                if (inputValue === '') {
+                                  field.onChange(0);
+                                  updateActualGrams(0);
                                   return;
                                 }
                                 
-                                // Check if the key is a decimal point (. or ,)
-                                if (key === '.' || key === ',') {
-                                  // If the field already has a decimal point, prevent adding another
-                                  if (currentValue.includes('.') || currentValue.includes(',')) {
-                                    e.preventDefault();
-                                  }
+                                // Normalize the input (replace comma with dot)
+                                const normalizedValue = inputValue.replace(',', '.');
+                                
+                                // Only allow valid numeric input
+                                if (!/^\d*\.?\d*$/.test(normalizedValue)) return;
+                                
+                                // Parse and update
+                                const numValue = parseFloat(normalizedValue);
+                                if (!isNaN(numValue)) {
+                                  field.onChange(numValue);
+                                  updateActualGrams(numValue);
                                 }
                               }}
                             />

@@ -3,8 +3,36 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  decimalInput?: boolean;
+}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, decimalInput, ...props }, ref) => {
+    // Handle decimal input for numeric fields
+    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!decimalInput) return;
+      
+      // Allow only numbers, one decimal point (either . or ,)
+      const allowedChars = /[0-9.,]/;
+      const key = e.key;
+      const value = (e.target as HTMLInputElement).value;
+      
+      // Reject if not an allowed character
+      if (!allowedChars.test(key)) {
+        e.preventDefault();
+        return;
+      }
+      
+      // If the key is a decimal point (. or ,)
+      if (key === '.' || key === ',') {
+        // If the field already has a decimal point, prevent adding another
+        if (value.includes('.') || value.includes(',')) {
+          e.preventDefault();
+        }
+      }
+    };
+
     return (
       <input
         type={type}
@@ -13,6 +41,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className
         )}
         ref={ref}
+        onKeyDown={decimalInput ? handleKeyPress : undefined}
         {...props}
       />
     )
