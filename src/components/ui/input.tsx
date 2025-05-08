@@ -13,21 +13,27 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (!decimalInput) return;
       
-      // Allow decimal points (both period and comma)
-      const allowedKeys = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", ",", "-"];
+      // Allow only numbers and comma (no periods)
+      const allowedKeys = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "-"];
       const controlKeys = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter", "Home", "End"];
       
       // Check if we already have a decimal separator in the value
       const currentValue = e.currentTarget.value;
-      const hasDecimalSeparator = currentValue.includes('.') || currentValue.includes(',');
+      const hasDecimalSeparator = currentValue.includes(',');
       
       // Do not allow multiple decimal separators
-      if ((e.key === '.' || e.key === ',') && hasDecimalSeparator) {
+      if (e.key === ',' && hasDecimalSeparator) {
         e.preventDefault();
         return;
       }
       
-      // Allow control keys, numbers and decimal points
+      // Block periods completely
+      if (e.key === '.') {
+        e.preventDefault();
+        return;
+      }
+      
+      // Allow control keys, numbers and comma
       if (!allowedKeys.includes(e.key) && !controlKeys.includes(e.key) && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
       }

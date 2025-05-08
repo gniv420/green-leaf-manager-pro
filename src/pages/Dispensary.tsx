@@ -636,8 +636,8 @@ const Dispensary = () => {
                                 // Normalize the input (replace comma with dot for calculation)
                                 const normalizedValue = inputValue.replace(',', '.');
                                 
-                                // Only allow valid numeric input with decimal point
-                                if (!/^\d*\.?\d*$/.test(normalizedValue)) return;
+                                // Only allow valid numeric input with comma
+                                if (!/^\d*,?\d*$/.test(inputValue)) return;
                                 
                                 // Update the field with the parsed numeric value
                                 const numValue = parseFloat(normalizedValue);
@@ -707,8 +707,8 @@ const Dispensary = () => {
                                 // Normalize the input (replace comma with dot for calculation)
                                 const normalizedValue = inputValue.replace(',', '.');
                                 
-                                // Only allow valid numeric input with decimal point
-                                if (!/^\d*\.?\d*$/.test(normalizedValue)) return;
+                                // Only allow valid numeric input with comma
+                                if (!/^\d*,?\d*$/.test(inputValue)) return;
                                 
                                 // Parse and update
                                 const numValue = parseFloat(normalizedValue);

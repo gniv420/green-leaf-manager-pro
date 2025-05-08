@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Utility to normalize decimal input (accepts both comma and dot)
+// Utility to normalize decimal input (accepts only comma)
 export function normalizeDecimalInput(value: string): number {
   // Replace comma with dot for calculation
   const normalizedValue = value.replace(',', '.');
