@@ -1,4 +1,3 @@
-
 import Dexie, { Table } from 'dexie';
 
 import { ProductType } from './product-types';
@@ -164,10 +163,10 @@ class ClubDatabase extends Dexie {
 export const db = new ClubDatabase();
 
 db.on('populate', async () => {
-  // Add initial admin user
+  // Add initial admin user with password 1234
   await db.users.add({
     username: 'admin',
-    password: 'admin',
+    password: '1234',
     fullName: 'Administrator',
     isAdmin: true,
     createdAt: new Date()
