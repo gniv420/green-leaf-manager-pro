@@ -180,7 +180,7 @@ const Dispensary = () => {
         setIsAddDialogOpen(true);
       } else {
         toast({
-          variant: 'warning',
+          variant: 'default',
           title: 'Caja cerrada',
           description: 'Debes abrir una caja antes de realizar dispensaciones.'
         });
