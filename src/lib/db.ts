@@ -1,7 +1,8 @@
+
 import Dexie, { Table } from 'dexie';
 
 import { ProductType } from './product-types';
-import { Document, DocumentType } from './document-types';
+import type { Document, DocumentType } from './document-types';
 
 export type { Document } from './document-types';
 
@@ -166,7 +167,7 @@ db.on('populate', async () => {
   // Add initial admin user with password 1234
   await db.users.add({
     username: 'admin',
-    password: '1234',
+    password: '1234', // Changed from 'admin' to '1234'
     fullName: 'Administrator',
     isAdmin: true,
     createdAt: new Date()
