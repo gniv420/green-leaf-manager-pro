@@ -675,12 +675,35 @@ const Dispensary = () => {
                               inputMode="decimal"
                               value={field.value}
                               onChange={(e) => {
-                                // Improved handling of decimal input
-                                // Allow both comma and period as decimal separators
-                                const inputValue = e.target.value.replace(/,/g, '.');
+                                // Fixed decimal input handling
+                                // Allow both period and comma as decimal separators
+                                let inputValue = e.target.value;
+                                // This ensures we accept both . and , as decimal separators
+                                inputValue = inputValue.replace(',', '.');
+                                // Parse the value, defaulting to 0 if NaN
                                 const value = parseFloat(inputValue) || 0;
                                 field.onChange(value);
                                 updateActualGrams(value);
+                              }}
+                              onKeyPress={(e) => {
+                                // Allow numbers, one decimal point (either . or ,)
+                                const allowedChars = /[0-9.,]/;
+                                const currentValue = e.currentTarget.value;
+                                const key = e.key;
+                                
+                                // Reject if not an allowed character
+                                if (!allowedChars.test(key)) {
+                                  e.preventDefault();
+                                  return;
+                                }
+                                
+                                // Check if the key is a decimal point (. or ,)
+                                if (key === '.' || key === ',') {
+                                  // If the field already has a decimal point, prevent adding another
+                                  if (currentValue.includes('.') || currentValue.includes(',')) {
+                                    e.preventDefault();
+                                  }
+                                }
                               }}
                             />
                           </div>
