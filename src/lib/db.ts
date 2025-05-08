@@ -134,6 +134,11 @@ class ClubDatabase extends Dexie {
     this.version(3).stores({
       memberTransactions: "++id, memberId, createdAt, type"
     });
+    
+    // Add index for openedAt in cashRegisters
+    this.version(4).stores({
+      cashRegisters: "++id, openDate, closeDate, status, openedAt"
+    });
   }
 
   // Helper method to generate member codes
