@@ -269,7 +269,7 @@ const MemberForm = () => {
         </h1>
       </div>
 
-      {isEditing && (
+      {isEditing ? (
         <Tabs defaultValue="details" className="w-full">
           <TabsList>
             <TabsTrigger value="details">Detalles</TabsTrigger>
@@ -516,9 +516,7 @@ const MemberForm = () => {
             <DocumentsSection memberId={parseInt(id!)} />
           </TabsContent>
         </Tabs>
-      )}
-
-      {!isEditing && (
+      ) : (
         <form onSubmit={handleSubmit}>
           <Card className="border-green-200">
             <CardHeader>
