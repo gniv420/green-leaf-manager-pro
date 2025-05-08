@@ -74,7 +74,7 @@ const Settings = () => {
       
       const a = document.createElement('a');
       a.href = url;
-      a.download = `greenleaf_export_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `nivaria_export_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -108,7 +108,7 @@ const Settings = () => {
       
       const a = document.createElement('a');
       a.href = url;
-      a.download = `greenleaf_sqlite_${new Date().toISOString().split('T')[0]}.sql`;
+      a.download = `nivaria_sqlite_${new Date().toISOString().split('T')[0]}.sql`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

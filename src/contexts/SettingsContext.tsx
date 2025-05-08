@@ -16,7 +16,7 @@ interface SettingsContextType {
 }
 
 const defaultSettings = {
-  associationName: 'Nivaria CSC',
+  associationName: 'NivariaCSC Manager',
   primaryColor: '#15803d', // Green color
   logoUrl: '',
   logoPreview: '',
