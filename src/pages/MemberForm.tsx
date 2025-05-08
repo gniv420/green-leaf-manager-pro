@@ -49,7 +49,7 @@ const MemberForm = () => {
   const [sponsors, setSponsors] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [showSensitiveInfo, setShowSensitiveInfo] = useState(false);
+  const [showSensitiveInfo, setShowSensitiveInfo] = useState(true); // Changed to true by default
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
   const [transactionAmount, setTransactionAmount] = useState<number>(0);
@@ -182,14 +182,7 @@ const MemberForm = () => {
     }
   };
 
-  const toggleSensitiveInfo = () => {
-    setShowSensitiveInfo(!showSensitiveInfo);
-  };
-
   const maskedValue = (value: string) => {
-    if (!showSensitiveInfo) {
-      return value.replace(/./g, '•');
-    }
     return value;
   };
 
@@ -290,7 +283,7 @@ const MemberForm = () => {
                     variant="ghost" 
                     size="icon"
                     type="button"
-                    onClick={toggleSensitiveInfo}
+                    onClick={() => setShowSensitiveInfo(!showSensitiveInfo)}
                     title={showSensitiveInfo ? "Ocultar información sensible" : "Mostrar información sensible"}
                   >
                     {showSensitiveInfo ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -325,7 +318,7 @@ const MemberForm = () => {
                       <Input
                         id="dni"
                         name="dni"
-                        value={maskedValue(formData.dni)}
+                        value={formData.dni}
                         onChange={handleInputChange}
                         required
                         className="border-green-200 focus-visible:ring-green-500"
@@ -336,7 +329,7 @@ const MemberForm = () => {
                       <Input
                         id="dob"
                         type="date"
-                        value={maskedValue(formData.dob.toISOString().split('T')[0])}
+                        value={formData.dob.toISOString().split('T')[0]}
                         onChange={handleDateChange}
                         required
                         className="border-green-200 focus-visible:ring-green-500"
@@ -347,7 +340,7 @@ const MemberForm = () => {
                       <Input
                         id="phone"
                         name="phone"
-                        value={maskedValue(formData.phone)}
+                        value={formData.phone}
                         onChange={handleInputChange}
                         required
                         className="border-green-200 focus-visible:ring-green-500"
