@@ -99,8 +99,8 @@ export const MainLayout = () => {
     navigate("/login");
   };
 
-  // Create the SidebarContent component to use inside SidebarProvider
-  const SidebarContent = () => {
+  // Create the AppSidebar component to use inside SidebarProvider
+  const AppSidebar = () => {
     return (
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader className="flex items-center justify-center border-b">
@@ -155,7 +155,7 @@ export const MainLayout = () => {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full bg-background">
-        <SidebarContent />
+        <AppSidebar />
         
         <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
           <div className="p-2 border-b flex items-center">
