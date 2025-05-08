@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ interface SidebarItem {
 }
 
 export const MainLayout = () => {
-  const { isMobile } = useIsMobile();
+  const isMobile = useIsMobile();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
