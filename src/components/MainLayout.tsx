@@ -110,9 +110,11 @@ export const MainLayout = () => {
               <Cannabis className="h-6 w-6 text-green-600" />
             )}
             <span className="text-lg font-semibold truncate">{associationName}</span>
-            <SidebarTrigger className="ml-auto p-1 bg-sidebar-accent hover:bg-sidebar-accent/80 rounded-md flex items-center justify-center">
-              <Menu className="h-4 w-4" />
-            </SidebarTrigger>
+            {state !== "collapsed" && (
+              <SidebarTrigger className="ml-auto p-1 bg-sidebar-accent hover:bg-sidebar-accent/80 rounded-md flex items-center justify-center">
+                <Menu className="h-4 w-4" />
+              </SidebarTrigger>
+            )}
           </div>
         </SidebarHeader>
         
