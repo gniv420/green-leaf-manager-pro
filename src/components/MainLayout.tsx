@@ -12,6 +12,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  SidebarRail,
   useSidebar
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,8 @@ import {
   Package2,
   User,
   FileBarChart,
-  LogOut
+  LogOut,
+  ChevronLeft
 } from "lucide-react";
 
 interface SidebarItem {
@@ -148,6 +150,9 @@ export const MainLayout = () => {
               <span className="font-medium">Cerrar sesión</span>
             </Button>
           </SidebarFooter>
+          
+          {/* Add the sidebar rail for collapsing */}
+          <SidebarRail />
         </Sidebar>
         
         <div className="flex-1 flex flex-col min-h-screen overflow-hidden">

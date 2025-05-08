@@ -150,6 +150,21 @@
   @apply opacity-0;
 }
 
+/* Make sure the sidebar rail is visible */
+[data-sidebar="rail"] {
+  @apply cursor-pointer opacity-100 hover:after:bg-sidebar-accent z-40;
+}
+
+/* Add a visible indication for the sidebar rail */
+[data-sidebar="rail"]::after {
+  @apply opacity-100;
+}
+
+/* Improve sidebar trigger visibility */
+[data-sidebar="trigger"] {
+  @apply hover:bg-accent hover:text-accent-foreground;
+}
+
 /* Custom card shadow */
 .card-shadow {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
