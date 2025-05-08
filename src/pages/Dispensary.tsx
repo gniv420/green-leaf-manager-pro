@@ -43,6 +43,12 @@ import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Helper function to safely format numbers
+const formatNumber = (value: any): string => {
+  const num = typeof value === 'number' ? value : Number(value);
+  return isNaN(num) ? '0.00' : num.toFixed(2);
+};
+
 const Dispensary = () => {
   const [searchParams] = useSearchParams();
   const preselectedMemberId = searchParams.get('memberId');
@@ -88,7 +94,18 @@ const Dispensary = () => {
   );
 
   const members = useLiveQuery(() => db.members.toArray());
-  const products = useLiveQuery(() => db.products.toArray());
+  
+  // Normalize product data to ensure numeric values
+  const products = useLiveQuery(async () => {
+    const allProducts = await db.products.toArray();
+    
+    // Ensure all products have proper number values for numeric fields
+    return allProducts.map(product => ({
+      ...product,
+      price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
+      stockGrams: typeof product.stockGrams === 'number' ? product.stockGrams : Number(product.stockGrams) || 0
+    }));
+  });
   
   // Obtenemos el registro de caja abierta para validar
   const currentCashRegister = useLiveQuery(() => {
@@ -133,7 +150,17 @@ const Dispensary = () => {
   const selectedProduct = useLiveQuery(
     async () => {
       if (!watchProductId) return null;
-      return await db.products.get(parseInt(watchProductId));
+      const product = await db.products.get(parseInt(watchProductId));
+      
+      // Ensure numeric values
+      if (product) {
+        return {
+          ...product,
+          price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
+          stockGrams: typeof product.stockGrams === 'number' ? product.stockGrams : Number(product.stockGrams) || 0
+        };
+      }
+      return null;
     },
     [watchProductId]
   );
@@ -185,7 +212,11 @@ const Dispensary = () => {
         return;
       }
       
-      if (product.stockGrams < actualGrams) {
+      // Ensure stockGrams is a number
+      const stockGramsNum = typeof product.stockGrams === 'number' ? 
+        product.stockGrams : Number(product.stockGrams) || 0;
+      
+      if (stockGramsNum < actualGrams) {
         toast({
           title: "Error",
           description: "No hay suficiente stock disponible",
@@ -208,7 +239,7 @@ const Dispensary = () => {
       
       // Actualizar stock del producto con los gramos reales dispensados
       await db.products.update(productId, {
-        stockGrams: product.stockGrams - actualGrams,
+        stockGrams: stockGramsNum - actualGrams,
         updatedAt: new Date()
       });
       
@@ -317,8 +348,8 @@ const Dispensary = () => {
                     <TableCell className="font-mono">{record.memberCode}</TableCell>
                     <TableCell className="font-medium">{record.memberName}</TableCell>
                     <TableCell>{record.productName}</TableCell>
-                    <TableCell>{record.quantity.toFixed(2)}g</TableCell>
-                    <TableCell className="text-right">{record.price.toFixed(2)}€</TableCell>
+                    <TableCell>{formatNumber(record.quantity)}g</TableCell>
+                    <TableCell className="text-right">{formatNumber(record.price)}€</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -375,15 +406,15 @@ const Dispensary = () => {
                       <SelectContent>
                         {products?.map((product) => (
                           <SelectItem key={product.id} value={String(product.id)}>
-                            {product.name} - {product.stockGrams.toFixed(2)}g disponibles
+                            {product.name} - {formatNumber(product.stockGrams)}g disponibles
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     {selectedProduct && (
                       <FormDescription className="mt-1">
-                        Precio: {selectedProduct.price}€/g · 
-                        Stock disponible: {selectedProduct.stockGrams.toFixed(2)}g
+                        Precio: {formatNumber(selectedProduct.price)}€/g · 
+                        Stock disponible: {formatNumber(selectedProduct.stockGrams)}g
                       </FormDescription>
                     )}
                     <FormMessage />
@@ -458,7 +489,7 @@ const Dispensary = () => {
                             type="number" 
                             step="0.01" 
                             min="0" 
-                            max={selectedProduct?.stockGrams || 0}
+                            max={selectedProduct ? selectedProduct.stockGrams : 0}
                             onChange={(e) => {
                               const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                               if (selectedProduct && val > selectedProduct.stockGrams) {
