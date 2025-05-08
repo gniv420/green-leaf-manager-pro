@@ -6,7 +6,7 @@ import { db, Dispensary as DispensaryRecord, Member, Product } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Cannabis, Plus, Search, User, Package, DollarSign, Hash, Scale, ArrowRight } from 'lucide-react';
+import { Cannabis, Plus, Search, User, Package, DollarSign, Hash, Scale, ArrowRight, Trash } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -49,12 +49,23 @@ const formatNumber = (value: any): string => {
   return isNaN(num) ? '0.00' : num.toFixed(2);
 };
 
+// Interfaz para los items en el carrito
+interface CartItem {
+  productId: number;
+  productName: string;
+  price: number;
+  quantity: number;
+}
+
 const Dispensary = () => {
   const [searchParams] = useSearchParams();
   const preselectedMemberId = searchParams.get('memberId');
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>(preselectedMemberId || '');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
   const { toast } = useToast();
 
   const dispensaryRecords = useLiveQuery(
@@ -106,6 +117,11 @@ const Dispensary = () => {
       stockGrams: typeof product.stockGrams === 'number' ? product.stockGrams : Number(product.stockGrams) || 0
     }));
   });
+
+  // Productos filtrados por búsqueda
+  const filteredProducts = products?.filter(product => 
+    product.name.toLowerCase().includes(productSearchQuery.toLowerCase())
+  );
   
   // Obtenemos el registro de caja abierta para validar
   const currentCashRegister = useLiveQuery(() => {
@@ -117,22 +133,12 @@ const Dispensary = () => {
 
   type FormValues = {
     memberId: string;
-    productId: string;
-    amountEuros: number;
-    calculatedGrams: number;
-    actualGrams: number;
-    notes: string;
     paymentMethod: 'cash' | 'bizum' | 'wallet';
   };
 
   const form = useForm<FormValues>({
     defaultValues: {
       memberId: preselectedMemberId || '',
-      productId: '',
-      amountEuros: 0,
-      calculatedGrams: 0,
-      actualGrams: 0,
-      notes: '',
       paymentMethod: 'cash'
     }
   });
@@ -141,42 +147,59 @@ const Dispensary = () => {
   useEffect(() => {
     if (preselectedMemberId) {
       form.setValue('memberId', preselectedMemberId);
+      setSelectedMemberId(preselectedMemberId);
     }
   }, [preselectedMemberId, form]);
 
-  const watchProductId = form.watch('productId');
-  const watchAmountEuros = form.watch('amountEuros');
-  
-  const selectedProduct = useLiveQuery(
-    async () => {
-      if (!watchProductId) return null;
-      const product = await db.products.get(parseInt(watchProductId));
+  // Añadir producto al carrito
+  const addToCart = (product: Product) => {
+    setCart(prevCart => {
+      // Verificar si el producto ya está en el carrito
+      const existing = prevCart.find(item => item.productId === product.id);
       
-      // Ensure numeric values
-      if (product) {
-        return {
-          ...product,
-          price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
-          stockGrams: typeof product.stockGrams === 'number' ? product.stockGrams : Number(product.stockGrams) || 0
-        };
+      if (existing) {
+        // Incrementar cantidad si ya existe
+        return prevCart.map(item => 
+          item.productId === product.id 
+            ? { ...item, quantity: item.quantity + 1 } 
+            : item
+        );
+      } else {
+        // Añadir nuevo item al carrito
+        return [...prevCart, {
+          productId: product.id!,
+          productName: product.name,
+          price: product.price,
+          quantity: 1
+        }];
       }
-      return null;
-    },
-    [watchProductId]
-  );
-  
-  // Calcular los gramos en base al precio del producto seleccionado
-  useEffect(() => {
-    if (selectedProduct && watchAmountEuros > 0) {
-      const calculatedGrams = selectedProduct.price > 0 ? 
-        watchAmountEuros / selectedProduct.price : 0;
-      form.setValue('calculatedGrams', parseFloat(calculatedGrams.toFixed(2)));
-      form.setValue('actualGrams', parseFloat(calculatedGrams.toFixed(2)));
+    });
+  };
+
+  // Actualizar cantidad de un producto en el carrito
+  const updateCartItemQuantity = (productId: number, quantity: number) => {
+    if (quantity <= 0) {
+      // Eliminar el producto si la cantidad es 0 o menos
+      setCart(prevCart => prevCart.filter(item => item.productId !== productId));
     } else {
-      form.setValue('calculatedGrams', 0);
-      form.setValue('actualGrams', 0);
+      // Actualizar la cantidad
+      setCart(prevCart => 
+        prevCart.map(item => 
+          item.productId === productId 
+            ? { ...item, quantity } 
+            : item
+        )
+      );
     }
-  }, [selectedProduct, watchAmountEuros, form]);
+  };
+
+  // Eliminar producto del carrito
+  const removeFromCart = (productId: number) => {
+    setCart(prevCart => prevCart.filter(item => item.productId !== productId));
+  };
+
+  // Calcular total del carrito
+  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   const onSubmit = async (data: FormValues) => {
     try {
@@ -189,65 +212,77 @@ const Dispensary = () => {
         });
         return;
       }
+
+      // Verificar que hay productos en el carrito
+      if (cart.length === 0) {
+        toast({
+          title: "Error",
+          description: "Añada productos al carrito para realizar la dispensación",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // En una aplicación real, obtendríamos el userId del contexto de autenticación
       const userId = 1; // Usando el admin por defecto
       
-      const productId = parseInt(data.productId);
       const memberId = parseInt(data.memberId);
-      const actualGrams = data.actualGrams;
-      
-      // Obtain the selected payment method
       const paymentMethod = data.paymentMethod;
       
-      // Obtener el producto para verificar stock y precio
-      const product = await db.products.get(productId);
-      
-      if (!product) {
-        toast({
-          title: "Error",
-          description: "El producto no existe",
-          variant: "destructive",
+      // Procesar cada producto en el carrito
+      for (const item of cart) {
+        // Obtener el producto para verificar stock
+        const product = await db.products.get(item.productId);
+        
+        if (!product) {
+          toast({
+            title: "Error",
+            description: `El producto ${item.productName} ya no existe`,
+            variant: "destructive",
+          });
+          continue;
+        }
+        
+        // Ensure stockGrams is a number
+        const stockGramsNum = typeof product.stockGrams === 'number' ? 
+          product.stockGrams : Number(product.stockGrams) || 0;
+        
+        if (stockGramsNum < item.quantity) {
+          toast({
+            title: "Error",
+            description: `No hay suficiente stock de ${item.productName}`,
+            variant: "destructive",
+          });
+          continue;
+        }
+        
+        // Calcular precio total por ítem
+        const itemPrice = item.price * item.quantity;
+        
+        // Registrar dispensación
+        await db.dispensary.add({
+          memberId,
+          productId: item.productId,
+          quantity: item.quantity,
+          price: itemPrice,
+          paymentMethod,
+          notes: `Dispensación múltiple - ${item.productName}`,
+          userId,
+          createdAt: new Date()
         });
-        return;
+        
+        // Actualizar stock del producto
+        await db.products.update(item.productId, {
+          stockGrams: stockGramsNum - item.quantity,
+          updatedAt: new Date()
+        });
       }
       
-      // Ensure stockGrams is a number
-      const stockGramsNum = typeof product.stockGrams === 'number' ? 
-        product.stockGrams : Number(product.stockGrams) || 0;
-      
-      if (stockGramsNum < actualGrams) {
-        toast({
-          title: "Error",
-          description: "No hay suficiente stock disponible",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Registrar dispensación con el importe en euros
-      await db.dispensary.add({
-        memberId,
-        productId,
-        quantity: actualGrams, // Ahora usamos los gramos reales dispensados
-        price: data.amountEuros, // Ahora guardamos el precio en euros que ha pagado
-        paymentMethod,
-        notes: data.notes,
-        userId,
-        createdAt: new Date()
-      });
-      
-      // Actualizar stock del producto con los gramos reales dispensados
-      await db.products.update(productId, {
-        stockGrams: stockGramsNum - actualGrams,
-        updatedAt: new Date()
-      });
-      
-      // Registrar como ingreso en caja
+      // Registrar el total como ingreso en caja
       await db.cashTransactions.add({
         type: 'income',
-        amount: data.amountEuros, // Usamos el importe en euros
-        concept: `Dispensación ${product.name}`,
+        amount: cartTotal,
+        concept: `Dispensación múltiple`,
         notes: `Para socio ID: ${memberId}`,
         userId,
         paymentMethod,
@@ -257,11 +292,12 @@ const Dispensary = () => {
       
       toast({
         title: "Dispensación registrada",
-        description: "La dispensación ha sido registrada correctamente",
+        description: "La dispensación múltiple ha sido registrada correctamente",
       });
       
+      // Limpiar carrito y cerrar diálogo
+      setCart([]);
       setIsAddDialogOpen(false);
-      form.reset();
       // Mantener el miembro seleccionado si vino por parámetro
       if (preselectedMemberId) {
         form.setValue('memberId', preselectedMemberId);
@@ -359,9 +395,9 @@ const Dispensary = () => {
       </Card>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar Nueva Dispensación</DialogTitle>
+            <DialogTitle>Nueva Dispensación</DialogTitle>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -371,7 +407,13 @@ const Dispensary = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Socio</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedMemberId(value);
+                      }} 
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger className="flex items-center">
                           <User className="mr-2 h-4 w-4" />
@@ -390,142 +432,130 @@ const Dispensary = () => {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="productId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Producto</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="flex items-center">
-                          <Package className="mr-2 h-4 w-4" />
-                          <SelectValue placeholder="Seleccionar producto" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {products?.map((product) => (
-                          <SelectItem key={product.id} value={String(product.id)}>
-                            {product.name} - {formatNumber(product.stockGrams)}g disponibles
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedProduct && (
-                      <FormDescription className="mt-1">
-                        Precio: {formatNumber(selectedProduct.price)}€/g · 
-                        Stock disponible: {formatNumber(selectedProduct.stockGrams)}g
-                      </FormDescription>
-                    )}
-                    <FormMessage />
-                  </FormItem>
+
+              <div className="space-y-4 border rounded-md p-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Selección de productos</h3>
+                  <div className="relative w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      placeholder="Buscar producto..."
+                      className="w-full pl-8"
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {filteredProducts?.map((product) => (
+                    <Card 
+                      key={product.id} 
+                      className={`cursor-pointer hover:border-primary ${
+                        cart.some(item => item.productId === product.id) 
+                          ? 'border-primary' 
+                          : ''
+                      }`}
+                      onClick={() => addToCart(product)}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex flex-col">
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatNumber(product.price)}€/g · 
+                            Stock: {formatNumber(product.stockGrams)}g
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {cart.length > 0 && (
+                  <div className="space-y-3 mt-4">
+                    <h4 className="text-sm font-medium">Carrito de dispensación</h4>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Producto</TableHead>
+                            <TableHead>Precio/g</TableHead>
+                            <TableHead>Cantidad (g)</TableHead>
+                            <TableHead className="text-right">Subtotal</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {cart.map((item) => (
+                            <TableRow key={item.productId}>
+                              <TableCell>{item.productName}</TableCell>
+                              <TableCell>{formatNumber(item.price)}€</TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <Button 
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="px-2 py-0 h-7 w-7"
+                                    onClick={() => updateCartItemQuantity(item.productId, item.quantity - 0.5)}
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min="0.1"
+                                    step="0.1"
+                                    className="w-16 h-7"
+                                    value={item.quantity}
+                                    onChange={(e) => updateCartItemQuantity(
+                                      item.productId, 
+                                      parseFloat(e.target.value) || 0
+                                    )}
+                                  />
+                                  <Button 
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="px-2 py-0 h-7 w-7"
+                                    onClick={() => updateCartItemQuantity(item.productId, item.quantity + 0.5)}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatNumber(item.price * item.quantity)}€
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => removeFromCart(item.productId)}
+                                >
+                                  <Trash className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-right font-medium">
+                              Total:
+                            </TableCell>
+                            <TableCell className="text-right font-bold">
+                              {formatNumber(cartTotal)}€
+                            </TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
                 )}
-              />
-              <div className="grid grid-cols-1 gap-4">
-                <FormField
-                  control={form.control}
-                  name="amountEuros"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Importe (euros)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input 
-                            {...field} 
-                            className="pl-8"
-                            type="number" 
-                            step="0.01" 
-                            min="0" 
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                              field.onChange(val);
-                            }}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="calculatedGrams"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cantidad calculada (gramos)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Hash className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input 
-                            {...field} 
-                            className="pl-8"
-                            type="number" 
-                            step="0.01" 
-                            readOnly
-                            disabled
-                          />
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Cantidad calculada según el precio por gramo
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="actualGrams"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Gramos reales dispensados</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Scale className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input 
-                            {...field} 
-                            className="pl-8"
-                            type="number" 
-                            step="0.01" 
-                            min="0" 
-                            max={selectedProduct ? selectedProduct.stockGrams : 0}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                              if (selectedProduct && val > selectedProduct.stockGrams) {
-                                toast({
-                                  title: "Advertencia",
-                                  description: "La cantidad supera el stock disponible",
-                                  variant: "destructive",
-                                });
-                                return;
-                              }
-                              field.onChange(val);
-                            }}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Introduzca los gramos reales que se han dispensado
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notas (opcional)</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Notas adicionales" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
               <FormField
                 control={form.control}
                 name="paymentMethod"
@@ -553,15 +583,13 @@ const Dispensary = () => {
                   type="submit" 
                   disabled={
                     !form.watch('memberId') || 
-                    !form.watch('productId') || 
                     !form.watch('paymentMethod') ||
-                    form.watch('amountEuros') <= 0 || 
-                    form.watch('actualGrams') <= 0 ||
+                    cart.length === 0 ||
                     !currentCashRegister
                   }
                 >
                   <Cannabis className="mr-2 h-4 w-4" />
-                  Registrar Dispensación
+                  Completar Dispensación
                 </Button>
               </DialogFooter>
             </form>

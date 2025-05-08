@@ -5,7 +5,7 @@ import { db, Member as MemberType, Document as DocumentType } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Upload, Eye, Trash2, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Save, Upload, Eye, Trash2, Plus, Minus, Edit, X } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import DocumentsSection from '@/components/DocumentsSection';
 import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
@@ -32,6 +32,17 @@ const MemberDetails = () => {
   const [transactionAmount, setTransactionAmount] = useState<number>(0);
   const [transactionNotes, setTransactionNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  // Estado para el formulario de edición
+  const [editFormData, setEditFormData] = useState({
+    firstName: '',
+    lastName: '',
+    dni: '',
+    dob: '',
+    phone: '',
+    consumptionGrams: 0
+  });
   
   useEffect(() => {
     const fetchMember = async () => {
@@ -41,6 +52,15 @@ const MemberDetails = () => {
         const memberData = await db.members.get(memberId);
         if (memberData) {
           setMember(memberData);
+          // Inicializar el formulario con los datos del socio
+          setEditFormData({
+            firstName: memberData.firstName,
+            lastName: memberData.lastName,
+            dni: memberData.dni,
+            dob: format(new Date(memberData.dob), 'yyyy-MM-dd'),
+            phone: memberData.phone || '',
+            consumptionGrams: memberData.consumptionGrams || 0
+          });
         } else {
           toast({
             variant: 'destructive',
@@ -159,6 +179,49 @@ const MemberDetails = () => {
     }
   };
 
+  const handleEditFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: name === 'consumptionGrams' ? Number(value) : value
+    }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!member || !member.id) return;
+    
+    try {
+      const updatedMember = {
+        ...member,
+        firstName: editFormData.firstName,
+        lastName: editFormData.lastName,
+        dni: editFormData.dni,
+        dob: new Date(editFormData.dob),
+        phone: editFormData.phone,
+        consumptionGrams: Number(editFormData.consumptionGrams),
+        updatedAt: new Date()
+      };
+      
+      await db.members.update(member.id, updatedMember);
+      
+      // Actualizar el estado local
+      setMember(updatedMember);
+      setIsEditing(false);
+      
+      toast({
+        title: 'Cambios guardados',
+        description: 'Los datos del socio han sido actualizados'
+      });
+    } catch (error) {
+      console.error('Error updating member:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudieron guardar los cambios'
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -178,6 +241,23 @@ const MemberDetails = () => {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver
         </Button>
+        {!isEditing ? (
+          <Button variant="outline" onClick={() => setIsEditing(true)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Editar Datos
+          </Button>
+        ) : (
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={() => setIsEditing(false)}>
+              <X className="mr-2 h-4 w-4" />
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              <Save className="mr-2 h-4 w-4" />
+              Guardar
+            </Button>
+          </div>
+        )}
       </div>
       
       <div className="flex justify-between items-start">
@@ -209,30 +289,116 @@ const MemberDetails = () => {
         </div>
       </div>
       
-      {/* Tarjeta de información general y saldo */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Información General</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Fecha de nacimiento</p>
-            <p className="font-medium">{format(new Date(member.dob), 'dd/MM/yyyy', { locale: es })}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Consumo mensual</p>
-            <p className="font-medium">{member.consumptionGrams} gramos</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Fecha de registro</p>
-            <p className="font-medium">{format(new Date(member.createdAt), 'dd/MM/yyyy', { locale: es })}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Saldo disponible</p>
-            <p className="text-2xl font-bold text-green-600">{(member.balance || 0).toFixed(2)} €</p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Formulario de edición o tarjeta de información */}
+      {isEditing ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Editar Información</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="firstName" className="text-sm font-medium">
+                  Nombre
+                </label>
+                <Input 
+                  id="firstName"
+                  name="firstName"
+                  value={editFormData.firstName}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="lastName" className="text-sm font-medium">
+                  Apellidos
+                </label>
+                <Input 
+                  id="lastName"
+                  name="lastName"
+                  value={editFormData.lastName}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="dni" className="text-sm font-medium">
+                  DNI
+                </label>
+                <Input 
+                  id="dni"
+                  name="dni"
+                  value={editFormData.dni}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="dob" className="text-sm font-medium">
+                  Fecha de nacimiento
+                </label>
+                <Input 
+                  id="dob"
+                  name="dob"
+                  type="date"
+                  value={editFormData.dob}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="phone" className="text-sm font-medium">
+                  Teléfono
+                </label>
+                <Input 
+                  id="phone"
+                  name="phone"
+                  value={editFormData.phone}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="consumptionGrams" className="text-sm font-medium">
+                  Consumo mensual (gramos)
+                </label>
+                <Input 
+                  id="consumptionGrams"
+                  name="consumptionGrams"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={editFormData.consumptionGrams}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p>Código de socio: {member.memberCode}</p>
+              <p>Fecha de registro: {format(new Date(member.createdAt), 'dd/MM/yyyy', { locale: es })}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Información General</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Fecha de nacimiento</p>
+              <p className="font-medium">{format(new Date(member.dob), 'dd/MM/yyyy', { locale: es })}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Consumo mensual</p>
+              <p className="font-medium">{member.consumptionGrams} gramos</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Fecha de registro</p>
+              <p className="font-medium">{format(new Date(member.createdAt), 'dd/MM/yyyy', { locale: es })}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Saldo disponible</p>
+              <p className="text-2xl font-bold text-green-600">{(member.balance || 0).toFixed(2)} €</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       {/* Pestañas para documentos e historial */}
       <Tabs defaultValue="documents">

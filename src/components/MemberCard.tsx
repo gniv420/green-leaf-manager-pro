@@ -88,10 +88,10 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
           </div>
         </div>
       </CardContent>
-      <CardFooter className="pt-2 flex gap-2">
+      <CardFooter className="pt-2 flex flex-col gap-2">
         <Button 
           variant="default" 
-          className="flex-1 bg-green-600 hover:bg-green-700"
+          className="w-full bg-green-600 hover:bg-green-700"
           onClick={() => navigate(`/members/${member.id}`)}
         >
           <UserRound className="mr-2 h-4 w-4" />
@@ -99,7 +99,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
         </Button>
         <Button
           variant="outline"
-          className="flex-1"
+          className="w-full"
           onClick={handleDispensaryClick}
         >
           <Cannabis className="mr-2 h-4 w-4" />
