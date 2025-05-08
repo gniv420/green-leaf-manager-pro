@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, UserRound, Cannabis, Phone } from 'lucide-react';
+import { Eye, EyeOff, UserRound, Cannabis, Phone, Key } from 'lucide-react';
 import { Member } from '@/lib/db';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -74,10 +74,23 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
             <span className="text-muted-foreground">Teléfono:</span>
             <div className="flex items-center gap-1">
               <span className="font-medium">{maskedValue(member.phone || '666666666')}</span>
-              {showSensitiveInfo && (
+              {showSensitiveInfo && member.phone && (
                 <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handlePhoneCall}>
                   <Phone className="h-3 w-3" />
                 </Button>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">RFID:</span>
+            <div className="flex items-center gap-1">
+              {member.rfidCode ? (
+                <>
+                  <span className="font-medium font-mono">{showSensitiveInfo ? member.rfidCode : '••••••'}</span>
+                  <Key className="h-3 w-3 text-blue-500" />
+                </>
+              ) : (
+                <span className="text-muted-foreground italic text-xs">No asignado</span>
               )}
             </div>
           </div>

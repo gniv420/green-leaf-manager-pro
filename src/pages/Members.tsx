@@ -5,7 +5,7 @@ import { db, Member } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Search, Plus, Trash2, Grid, List, Cannabis } from 'lucide-react';
+import { Pencil, Search, Plus, Trash2, Grid, List, Cannabis, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -25,12 +25,93 @@ const Members = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid'); // Cambiado a grid por defecto
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
+  const [isRfidListening, setIsRfidListening] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchMembers();
   }, []);
+
+  useEffect(() => {
+    let buffer = '';
+    let lastInputTime = Date.now();
+    const TIMEOUT_MS = 500; // 500ms entre caracteres se considera un nuevo escaneo
+    
+    const keydownListener = (event: KeyboardEvent) => {
+      if (!isRfidListening) return;
+      
+      const currentTime = Date.now();
+      
+      // Si ha pasado mucho tiempo desde la última entrada, reiniciar el buffer
+      if (currentTime - lastInputTime > TIMEOUT_MS) {
+        buffer = '';
+      }
+      
+      lastInputTime = currentTime;
+      
+      // Solo procesar caracteres relevantes
+      if (/[\d\w]/.test(event.key) && event.key.length === 1) {
+        buffer += event.key;
+      }
+      
+      // Enter significa fin del escaneo
+      if (event.key === 'Enter' && buffer.length > 0) {
+        searchByRfid(buffer);
+        buffer = '';
+        event.preventDefault(); // Prevenir comportamiento default del Enter
+      }
+    };
+    
+    if (isRfidListening) {
+      window.addEventListener('keydown', keydownListener);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', keydownListener);
+    };
+  }, [isRfidListening]);
+
+  const searchByRfid = async (rfidCode: string) => {
+    try {
+      const memberWithRfid = await db.members.where('rfidCode').equals(rfidCode).first();
+      
+      if (memberWithRfid) {
+        // Navegar directamente a la ficha del socio
+        navigate(`/members/${memberWithRfid.id}`);
+        
+        toast({
+          title: 'Socio encontrado',
+          description: `${memberWithRfid.firstName} ${memberWithRfid.lastName}`
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'No encontrado',
+          description: 'No se encontró ningún socio con ese llavero RFID'
+        });
+        setIsRfidListening(false);
+      }
+    } catch (error) {
+      console.error('Error searching by RFID:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Error al buscar por RFID'
+      });
+      setIsRfidListening(false);
+    }
+  };
+
+  const toggleRfidListener = () => {
+    setIsRfidListening(prev => !prev);
+    if (!isRfidListening) {
+      toast({
+        title: 'Lector RFID activado',
+        description: 'Acerque el llavero al lector para buscar el socio'
+      });
+    }
+  };
 
   const fetchMembers = async () => {
     setIsLoading(true);
@@ -42,7 +123,8 @@ const Members = () => {
         ...member,
         memberCode: member.memberCode || '',
         consumptionGrams: member.consumptionGrams || 0,
-        balance: member.balance || 0
+        balance: member.balance || 0,
+        rfidCode: member.rfidCode || '',
       }));
       
       // Generate member codes for those who don't have one
@@ -67,7 +149,8 @@ const Members = () => {
           ...member,
           memberCode: member.memberCode || '',
           consumptionGrams: member.consumptionGrams || 0,
-          balance: member.balance || 0
+          balance: member.balance || 0,
+          rfidCode: member.rfidCode || '',
         }));
       }
       
@@ -140,7 +223,8 @@ const Members = () => {
       member.firstName.toLowerCase().includes(searchTermLower) ||
       member.lastName.toLowerCase().includes(searchTermLower) ||
       member.dni.toLowerCase().includes(searchTermLower) ||
-      (member.memberCode && member.memberCode.toLowerCase().includes(searchTermLower))
+      (member.memberCode && member.memberCode.toLowerCase().includes(searchTermLower)) ||
+      (member.rfidCode && member.rfidCode.toLowerCase().includes(searchTermLower))
     );
   });
 
@@ -156,16 +240,26 @@ const Members = () => {
         </Button>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, apellido, código o DNI..."
+            placeholder="Buscar por nombre, apellido, código, DNI o RFID..."
             className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        
+        <Button 
+          variant={isRfidListening ? "default" : "outline"}
+          onClick={toggleRfidListener}
+          className={isRfidListening ? "bg-amber-500 hover:bg-amber-600" : ""}
+        >
+          <Key className="mr-2 h-4 w-4" />
+          {isRfidListening ? "Escuchando RFID..." : "Lector RFID"}
+        </Button>
+        
         <div className="flex space-x-2">
           <Button 
             variant={viewMode === 'list' ? 'default' : 'outline'} 
@@ -199,7 +293,7 @@ const Members = () => {
                     <TableHead>DNI</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Apellidos</TableHead>
-                    <TableHead>Fecha de Nacimiento</TableHead>
+                    <TableHead>RFID</TableHead>
                     <TableHead>Consumo (g)</TableHead>
                     <TableHead>Saldo</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -213,9 +307,7 @@ const Members = () => {
                         <TableCell>{member.dni}</TableCell>
                         <TableCell>{member.firstName}</TableCell>
                         <TableCell>{member.lastName}</TableCell>
-                        <TableCell>
-                          {new Date(member.dob).toLocaleDateString()}
-                        </TableCell>
+                        <TableCell className="font-mono">{member.rfidCode || '-'}</TableCell>
                         <TableCell>{member.consumptionGrams}</TableCell>
                         <TableCell>{(member.balance || 0).toFixed(2)} €</TableCell>
                         <TableCell className="text-right">

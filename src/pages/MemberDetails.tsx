@@ -5,7 +5,7 @@ import { db, Member as MemberType, Document as DocumentType } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Upload, Eye, Trash2, Plus, Minus, Edit, X } from 'lucide-react';
+import { ArrowLeft, Save, Upload, Eye, Trash2, Plus, Minus, Edit, X, Key } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import DocumentsSection from '@/components/DocumentsSection';
 import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 const MemberDetails = () => {
@@ -33,6 +34,9 @@ const MemberDetails = () => {
   const [transactionNotes, setTransactionNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [isRfidDialogOpen, setIsRfidDialogOpen] = useState(false);
+  const [rfidCode, setRfidCode] = useState<string>('');
+  const [isListeningForRfid, setIsListeningForRfid] = useState(false);
   
   // Estado para el formulario de edición
   const [editFormData, setEditFormData] = useState({
@@ -41,7 +45,8 @@ const MemberDetails = () => {
     dni: '',
     dob: '',
     phone: '',
-    consumptionGrams: 0
+    consumptionGrams: 0,
+    rfidCode: '',
   });
   
   useEffect(() => {
@@ -59,7 +64,8 @@ const MemberDetails = () => {
             dni: memberData.dni,
             dob: format(new Date(memberData.dob), 'yyyy-MM-dd'),
             phone: memberData.phone || '',
-            consumptionGrams: memberData.consumptionGrams || 0
+            consumptionGrams: memberData.consumptionGrams || 0,
+            rfidCode: memberData.rfidCode || '',
           });
         } else {
           toast({
@@ -90,6 +96,56 @@ const MemberDetails = () => {
     setTransactionNotes('');
     setIsTransactionDialogOpen(true);
   };
+
+  // Listener para RFID
+  useEffect(() => {
+    let buffer = '';
+    let lastInputTime = Date.now();
+    const TIMEOUT_MS = 500; // 500ms entre caracteres se considera un nuevo escaneo
+    
+    const keydownListener = (event: KeyboardEvent) => {
+      if (!isListeningForRfid) return;
+      
+      const currentTime = Date.now();
+      
+      // Si ha pasado mucho tiempo desde la última entrada, reiniciar el buffer
+      if (currentTime - lastInputTime > TIMEOUT_MS) {
+        buffer = '';
+      }
+      
+      lastInputTime = currentTime;
+      
+      // Solo procesar caracteres relevantes
+      if (/[\d\w]/.test(event.key) && event.key.length === 1) {
+        buffer += event.key;
+      }
+      
+      // Enter significa fin del escaneo
+      if (event.key === 'Enter' && buffer.length > 0) {
+        setRfidCode(buffer);
+        setIsListeningForRfid(false);
+        event.preventDefault(); // Prevenir comportamiento default del Enter
+      }
+    };
+    
+    if (isListeningForRfid) {
+      window.addEventListener('keydown', keydownListener);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', keydownListener);
+    };
+  }, [isListeningForRfid]);
+  
+  // Cuando el código RFID cambia, actualizarlo en el formulario
+  useEffect(() => {
+    if (rfidCode && isRfidDialogOpen) {
+      setEditFormData(prev => ({
+        ...prev,
+        rfidCode
+      }));
+    }
+  }, [rfidCode, isRfidDialogOpen]);
   
   const handleTransaction = async () => {
     if (!member || !member.id || transactionAmount <= 0) return;
@@ -187,6 +243,47 @@ const MemberDetails = () => {
     }));
   };
 
+  const handleOpenRfidDialog = () => {
+    setRfidCode('');
+    setIsRfidDialogOpen(true);
+  };
+
+  const startRfidListener = () => {
+    setRfidCode('');
+    setIsListeningForRfid(true);
+  };
+
+  const handleSaveRfid = () => {
+    if (rfidCode) {
+      setEditFormData(prev => ({
+        ...prev,
+        rfidCode
+      }));
+      setIsRfidDialogOpen(false);
+      
+      // Si no estamos en modo edición, guardar directamente
+      if (!isEditing && member?.id) {
+        db.members.update(member.id, {
+          rfidCode,
+          updatedAt: new Date()
+        }).then(() => {
+          setMember(prev => prev ? {...prev, rfidCode} : null);
+          toast({
+            title: 'Llavero RFID asignado',
+            description: 'El código RFID ha sido asignado correctamente'
+          });
+        }).catch(error => {
+          console.error('Error saving RFID code:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'No se pudo guardar el código RFID'
+          });
+        });
+      }
+    }
+  };
+
   const handleSaveEdit = async () => {
     if (!member || !member.id) return;
     
@@ -199,6 +296,7 @@ const MemberDetails = () => {
         dob: new Date(editFormData.dob),
         phone: editFormData.phone,
         consumptionGrams: Number(editFormData.consumptionGrams),
+        rfidCode: editFormData.rfidCode,
         updatedAt: new Date()
       };
       
@@ -367,6 +465,24 @@ const MemberDetails = () => {
                   onChange={handleEditFormChange}
                 />
               </div>
+              <div className="space-y-2">
+                <label htmlFor="rfidCode" className="text-sm font-medium">
+                  Código RFID
+                </label>
+                <div className="flex gap-2">
+                  <Input 
+                    id="rfidCode"
+                    name="rfidCode"
+                    value={editFormData.rfidCode}
+                    onChange={handleEditFormChange}
+                    readOnly
+                    placeholder="Sin llavero asignado"
+                  />
+                  <Button type="button" onClick={handleOpenRfidDialog}>
+                    <Key className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
             <div className="text-sm text-muted-foreground">
               <p>Código de socio: {member.memberCode}</p>
@@ -395,6 +511,23 @@ const MemberDetails = () => {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Saldo disponible</p>
               <p className="text-2xl font-bold text-green-600">{(member.balance || 0).toFixed(2)} €</p>
+            </div>
+            <div>
+              <div className="flex justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Llavero RFID</p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 p-1" 
+                  onClick={handleOpenRfidDialog}
+                >
+                  <Key className="h-4 w-4 mr-1" />
+                  {member.rfidCode ? 'Cambiar' : 'Asignar'}
+                </Button>
+              </div>
+              <p className="font-medium font-mono">
+                {member.rfidCode || 'No asignado'}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -477,6 +610,57 @@ const MemberDetails = () => {
               variant={transactionType === 'deposit' ? 'default' : 'secondary'}
             >
               {transactionType === 'deposit' ? 'Añadir Saldo' : 'Retirar Saldo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Diálogo para RFID */}
+      <Dialog open={isRfidDialogOpen} onOpenChange={setIsRfidDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Lector de llavero RFID</DialogTitle>
+            <DialogDescription>
+              Pase el llavero RFID por el lector para registrar su código.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div>
+              <label htmlFor="rfidCodeInput" className="block text-sm font-medium mb-1">
+                Código RFID
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="rfidCodeInput"
+                  value={rfidCode}
+                  onChange={(e) => setRfidCode(e.target.value)}
+                  placeholder="Escanee el llavero o ingrese el código manualmente"
+                />
+                <Button 
+                  onClick={startRfidListener} 
+                  disabled={isListeningForRfid}
+                  variant="secondary"
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  {isListeningForRfid ? 'Escuchando...' : 'Escanear'}
+                </Button>
+              </div>
+              {isListeningForRfid && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Esperando lectura del llavero RFID...
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRfidDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveRfid}
+              disabled={!rfidCode}
+            >
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>

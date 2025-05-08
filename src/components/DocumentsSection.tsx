@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { db, Document } from '@/lib/db';
 import { DocumentType } from '@/lib/document-types';
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload, Download, FileImage } from 'lucide-react';
+import { Trash2, Upload, Download, FileImage, Maximize } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,8 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -206,6 +209,13 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
     }
   };
 
+  const openPreview = (doc: Document) => {
+    if (canShowThumbnail(doc)) {
+      setPreviewDocument(doc);
+      setPreviewDialogOpen(true);
+    }
+  };
+
   return (
     <Card className="border-green-200">
       <CardHeader>
@@ -272,7 +282,10 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
                   <div key={doc.id} className="flex items-center justify-between p-3">
                     <div className="flex items-center space-x-3">
                       {canShowThumbnail(doc) ? (
-                        <div className="h-12 w-12 rounded border overflow-hidden flex-shrink-0">
+                        <div 
+                          className="h-12 w-12 rounded border overflow-hidden flex-shrink-0 cursor-pointer"
+                          onClick={() => openPreview(doc)}
+                        >
                           <img 
                             src={getThumbnailUrl(doc)} 
                             alt={doc.name}
@@ -292,6 +305,16 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
                       </div>
                     </div>
                     <div className="flex space-x-2">
+                      {canShowThumbnail(doc) && (
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          onClick={() => openPreview(doc)}
+                          title="Ver imagen"
+                        >
+                          <Maximize className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button 
                         variant="outline" 
                         size="icon"
@@ -320,6 +343,7 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
         </div>
       </CardContent>
 
+      {/* Delete confirmation dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -335,6 +359,35 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
             <Button variant="destructive" onClick={handleDelete}>
               Eliminar
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image preview modal */}
+      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{previewDocument?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center">
+            {previewDocument && (
+              <img 
+                src={getThumbnailUrl(previewDocument)} 
+                alt={previewDocument.name}
+                className="max-h-[70vh] max-w-full object-contain"
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>
+              Cerrar
+            </Button>
+            {previewDocument && (
+              <Button onClick={() => handleDownload(previewDocument)}>
+                <Download className="mr-2 h-4 w-4" />
+                Descargar
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
