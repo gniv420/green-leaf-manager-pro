@@ -13,7 +13,6 @@ import MemberForm from "@/pages/MemberForm";
 import MemberDetails from "@/pages/MemberDetails";
 import Dispensary from "@/pages/Dispensary";
 import CashRegister from "@/pages/CashRegister";
-import CashManagement from "@/pages/CashManagement";
 import Inventory from "@/pages/Inventory";
 import Reports from "@/pages/Reports";
 import Settings from "@/pages/Settings";
@@ -47,7 +46,6 @@ function App() {
                   <Route path="members/:id" element={<MemberDetails />} />
                   <Route path="dispensary" element={<Dispensary />} />
                   <Route path="cash-register" element={<CashRegister />} />
-                  <Route path="cash-management" element={<CashManagement />} />
                   <Route path="inventory" element={<Inventory />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="settings" element={<Settings />} />
