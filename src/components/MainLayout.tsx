@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -11,7 +11,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger
+  SidebarTrigger,
+  useSidebar
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,7 +22,6 @@ import {
   Cannabis, 
   Users, 
   BarChart4, 
-  CreditCard, 
   Settings, 
   Menu, 
   CircleDollarSign, 
@@ -101,6 +101,9 @@ export const MainLayout = () => {
 
   // Create the AppSidebar component to use inside SidebarProvider
   const AppSidebar = () => {
+    // Use the useSidebar hook inside this component, which is rendered within SidebarProvider
+    const { state } = useSidebar();
+    
     return (
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader className="flex items-center justify-center border-b">
@@ -141,7 +144,7 @@ export const MainLayout = () => {
         <SidebarFooter className="border-t">
           <Button 
             variant="outline" 
-            className="w-full justify-start gap-2 hover:bg-primary hover:text-primary-foreground" 
+            className="w-full justify-start gap-2 hover:bg-primary hover:text-primary-foreground text-foreground"
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4" />

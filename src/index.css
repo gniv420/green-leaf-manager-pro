@@ -140,6 +140,11 @@
   @apply bg-gradient-to-br from-sidebar to-sidebar-accent;
 }
 
+/* Fix for logout button text contrast */
+[data-sidebar="sidebar"] button span {
+  @apply text-sidebar-foreground font-medium;
+}
+
 /* Custom card shadow */
 .card-shadow {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
