@@ -110,11 +110,6 @@ export const MainLayout = () => {
               <Cannabis className="h-6 w-6 text-green-600" />
             )}
             <span className="text-lg font-semibold truncate">{associationName}</span>
-            {state !== "collapsed" && (
-              <SidebarTrigger className="ml-auto p-1 bg-sidebar-accent hover:bg-sidebar-accent/80 rounded-md flex items-center justify-center">
-                <Menu className="h-4 w-4" />
-              </SidebarTrigger>
-            )}
           </div>
         </SidebarHeader>
         
@@ -145,22 +140,20 @@ export const MainLayout = () => {
         <SidebarFooter className="border-t">
           <Button 
             variant="outline" 
-            className="w-full justify-start gap-2 hover:bg-primary hover:text-primary-foreground bg-sidebar-accent text-white group-data-[collapsible=icon]:justify-center"
+            className="w-full justify-start gap-2 hover:bg-primary hover:text-primary-foreground bg-sidebar-accent text-white"
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4" />
-            <span className="font-medium">Cerrar sesión</span>
+            <span className="font-medium sidebar-logout-text">Cerrar sesión</span>
           </Button>
         </SidebarFooter>
       </Sidebar>
       
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <div className="p-2 border-b flex items-center">
-          {state === "collapsed" && (
-            <SidebarTrigger className="mr-2 p-1 bg-sidebar-accent hover:bg-sidebar-accent/80 rounded-md flex items-center justify-center">
-              <Menu className="h-4 w-4" />
-            </SidebarTrigger>
-          )}
+          <SidebarTrigger className="mr-2 p-1 bg-sidebar-accent hover:bg-sidebar-accent/80 rounded-md flex items-center justify-center">
+            <Menu className="h-4 w-4" />
+          </SidebarTrigger>
           <h2 className="text-lg font-medium">{associationName}</h2>
         </div>
         <div className="flex-1 overflow-y-auto p-4 md:p-6">

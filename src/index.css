@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -145,13 +144,17 @@
   @apply text-white font-medium;
 }
 
-/* Make logout button icon centered when sidebar is collapsed */
-[data-sidebar] [data-state="collapsed"] button[data-sidebar="menu-button"] span {
-  @apply opacity-0;
+/* Hide logout text when sidebar is collapsed and center the icon */
+[data-state="collapsed"] .sidebar-logout-text {
+  display: none;
 }
 
-/* Center the logout button icon when collapsed */
-[data-state="collapsed"] button.bg-sidebar-accent {
+[data-state="collapsed"] button[variant="outline"] {
+  @apply justify-center;
+}
+
+/* Make logout button icon centered when sidebar is collapsed */
+[data-state="collapsed"] .bg-sidebar-accent {
   @apply justify-center;
 }
 
