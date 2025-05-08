@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -5,7 +6,7 @@ import { db, Dispensary as DispensaryRecord, Member, Product } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Cannabis, Plus, Search } from 'lucide-react';
+import { Cannabis, Plus, Search, User, Package, DollarSign, Hash, Scale, ArrowRight } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -29,6 +30,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import {
   Select,
@@ -99,7 +101,9 @@ const Dispensary = () => {
   type FormValues = {
     memberId: string;
     productId: string;
-    quantity: number;
+    amountEuros: number;
+    calculatedGrams: number;
+    actualGrams: number;
     notes: string;
     paymentMethod: 'cash' | 'bizum' | 'wallet';
   };
@@ -108,7 +112,9 @@ const Dispensary = () => {
     defaultValues: {
       memberId: preselectedMemberId || '',
       productId: '',
-      quantity: 0,
+      amountEuros: 0,
+      calculatedGrams: 0,
+      actualGrams: 0,
       notes: '',
       paymentMethod: 'cash'
     }
@@ -122,6 +128,7 @@ const Dispensary = () => {
   }, [preselectedMemberId, form]);
 
   const watchProductId = form.watch('productId');
+  const watchAmountEuros = form.watch('amountEuros');
   
   const selectedProduct = useLiveQuery(
     async () => {
@@ -130,6 +137,19 @@ const Dispensary = () => {
     },
     [watchProductId]
   );
+  
+  // Calcular los gramos en base al precio del producto seleccionado
+  useEffect(() => {
+    if (selectedProduct && watchAmountEuros > 0) {
+      const calculatedGrams = selectedProduct.price > 0 ? 
+        watchAmountEuros / selectedProduct.price : 0;
+      form.setValue('calculatedGrams', parseFloat(calculatedGrams.toFixed(2)));
+      form.setValue('actualGrams', parseFloat(calculatedGrams.toFixed(2)));
+    } else {
+      form.setValue('calculatedGrams', 0);
+      form.setValue('actualGrams', 0);
+    }
+  }, [selectedProduct, watchAmountEuros, form]);
 
   const onSubmit = async (data: FormValues) => {
     try {
@@ -148,7 +168,7 @@ const Dispensary = () => {
       
       const productId = parseInt(data.productId);
       const memberId = parseInt(data.memberId);
-      const quantity = data.quantity;
+      const actualGrams = data.actualGrams;
       
       // Obtain the selected payment method
       const paymentMethod = data.paymentMethod;
@@ -165,7 +185,7 @@ const Dispensary = () => {
         return;
       }
       
-      if (product.stockGrams < quantity) {
+      if (product.stockGrams < actualGrams) {
         toast({
           title: "Error",
           description: "No hay suficiente stock disponible",
@@ -174,28 +194,28 @@ const Dispensary = () => {
         return;
       }
       
-      // Registrar dispensación
+      // Registrar dispensación con el importe en euros
       await db.dispensary.add({
         memberId,
         productId,
-        quantity,
-        price: product.price * quantity,
+        quantity: actualGrams, // Ahora usamos los gramos reales dispensados
+        price: data.amountEuros, // Ahora guardamos el precio en euros que ha pagado
         paymentMethod,
         notes: data.notes,
         userId,
         createdAt: new Date()
       });
       
-      // Actualizar stock del producto
+      // Actualizar stock del producto con los gramos reales dispensados
       await db.products.update(productId, {
-        stockGrams: product.stockGrams - quantity,
+        stockGrams: product.stockGrams - actualGrams,
         updatedAt: new Date()
       });
       
       // Registrar como ingreso en caja
       await db.cashTransactions.add({
         type: 'income',
-        amount: product.price * quantity,
+        amount: data.amountEuros, // Usamos el importe en euros
         concept: `Dispensación ${product.name}`,
         notes: `Para socio ID: ${memberId}`,
         userId,
@@ -308,7 +328,7 @@ const Dispensary = () => {
       </Card>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Registrar Nueva Dispensación</DialogTitle>
           </DialogHeader>
@@ -322,7 +342,8 @@ const Dispensary = () => {
                     <FormLabel>Socio</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="flex items-center">
+                          <User className="mr-2 h-4 w-4" />
                           <SelectValue placeholder="Seleccionar socio" />
                         </SelectTrigger>
                       </FormControl>
@@ -346,7 +367,8 @@ const Dispensary = () => {
                     <FormLabel>Producto</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="flex items-center">
+                          <Package className="mr-2 h-4 w-4" />
                           <SelectValue placeholder="Seleccionar producto" />
                         </SelectTrigger>
                       </FormControl>
@@ -358,52 +380,108 @@ const Dispensary = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {selectedProduct && (
+                      <FormDescription className="mt-1">
+                        Precio: {selectedProduct.price}€/g · 
+                        Stock disponible: {selectedProduct.stockGrams.toFixed(2)}g
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              {selectedProduct && (
-                <div className="text-sm text-muted-foreground">
-                  <p>Precio: {selectedProduct.price}€/g</p>
-                  <p>Stock disponible: {selectedProduct.stockGrams.toFixed(2)}g</p>
-                </div>
-              )}
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cantidad (gramos)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
-                        max={selectedProduct?.stockGrams || 0}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          if (selectedProduct && val > selectedProduct.stockGrams) {
-                            toast({
-                              title: "Advertencia",
-                              description: "La cantidad supera el stock disponible",
-                              variant: "destructive",
-                            });
-                            return;
-                          }
-                          field.onChange(val);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {selectedProduct && form.watch('quantity') > 0 && (
-                <div className="text-sm font-medium">
-                  Total a pagar: {(selectedProduct.price * form.watch('quantity')).toFixed(2)}€
-                </div>
-              )}
+              <div className="grid grid-cols-1 gap-4">
+                <FormField
+                  control={form.control}
+                  name="amountEuros"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Importe (euros)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            {...field} 
+                            className="pl-8"
+                            type="number" 
+                            step="0.01" 
+                            min="0" 
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                              field.onChange(val);
+                            }}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="calculatedGrams"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cantidad calculada (gramos)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Hash className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            {...field} 
+                            className="pl-8"
+                            type="number" 
+                            step="0.01" 
+                            readOnly
+                            disabled
+                          />
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Cantidad calculada según el precio por gramo
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="actualGrams"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gramos reales dispensados</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Scale className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            {...field} 
+                            className="pl-8"
+                            type="number" 
+                            step="0.01" 
+                            min="0" 
+                            max={selectedProduct?.stockGrams || 0}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                              if (selectedProduct && val > selectedProduct.stockGrams) {
+                                toast({
+                                  title: "Advertencia",
+                                  description: "La cantidad supera el stock disponible",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              field.onChange(val);
+                            }}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Introduzca los gramos reales que se han dispensado
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="notes"
@@ -446,7 +524,8 @@ const Dispensary = () => {
                     !form.watch('memberId') || 
                     !form.watch('productId') || 
                     !form.watch('paymentMethod') ||
-                    form.watch('quantity') <= 0 || 
+                    form.watch('amountEuros') <= 0 || 
+                    form.watch('actualGrams') <= 0 ||
                     !currentCashRegister
                   }
                 >

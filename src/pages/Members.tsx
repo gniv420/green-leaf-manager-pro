@@ -52,6 +52,13 @@ const Members = () => {
         allMembers = await db.members.toArray();
       }
       
+      // Add default values for missing properties
+      allMembers = allMembers.map(member => ({
+        ...member,
+        consumptionGrams: member.consumptionGrams || 0,
+        balance: member.balance || 0
+      }));
+      
       allMembers.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
