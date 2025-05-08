@@ -2,11 +2,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, Search } from 'lucide-react';
+import { Menu, Search, Sun, Moon } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import ThemeSwitcher from './ThemeSwitcher';
 import { Input } from './ui/input';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useTheme } from '@/hooks/use-theme';
+import { Switch } from './ui/switch';
 
 interface MainHeaderProps {
   toggleSidebar: () => void;
@@ -19,6 +20,7 @@ export function MainHeader({ toggleSidebar, title = 'Dashboard' }: MainHeaderPro
   const [searchInput, setSearchInput] = React.useState('');
   const [showSearch, setShowSearch] = React.useState(false);
   const debouncedSearch = useDebounce(searchInput, 300);
+  const { theme, toggleTheme } = useTheme();
   
   React.useEffect(() => {
     if (debouncedSearch) {
@@ -34,7 +36,7 @@ export function MainHeader({ toggleSidebar, title = 'Dashboard' }: MainHeaderPro
         </Button>
         {!showSearch && <h1 className="text-xl font-bold">{title}</h1>}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         {showSearch ? (
           <div className="relative w-full max-w-[300px]">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -60,7 +62,17 @@ export function MainHeader({ toggleSidebar, title = 'Dashboard' }: MainHeaderPro
             <Search className="h-5 w-5" />
           </Button>
         )}
-        <ThemeSwitcher />
+        
+        {/* Dark mode toggle */}
+        <div className="flex items-center gap-2">
+          <Sun className="h-4 w-4 text-muted-foreground" />
+          <Switch 
+            checked={theme === 'dark'}
+            onCheckedChange={toggleTheme}
+            aria-label="Cambiar tema"
+          />
+          <Moon className="h-4 w-4 text-muted-foreground" />
+        </div>
       </div>
     </header>
   );

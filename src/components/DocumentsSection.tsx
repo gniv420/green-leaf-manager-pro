@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { db, Document } from '@/lib/db';
 import { DocumentType } from '@/lib/document-types';
@@ -6,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
-import { Trash2, Upload, Download } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Trash2, Upload, Download, FileImage } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -166,6 +165,19 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
     }
   };
 
+  // Function to determine if a document can show a thumbnail
+  const canShowThumbnail = (doc: Document): boolean => {
+    return doc.contentType?.startsWith('image/') || false;
+  };
+
+  // Function to get thumbnail from document data
+  const getThumbnailUrl = (doc: Document): string => {
+    if (canShowThumbnail(doc)) {
+      return doc.data?.toString() || '';
+    }
+    return '';
+  };
+
   const confirmDelete = (id: number) => {
     setDocumentToDelete(id);
     setDeleteDialogOpen(true);
@@ -258,11 +270,26 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
               <div className="divide-y">
                 {documents.map((doc) => (
                   <div key={doc.id} className="flex items-center justify-between p-3">
-                    <div>
-                      <p className="font-medium">{doc.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(doc.createdAt).toLocaleDateString()}
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      {canShowThumbnail(doc) ? (
+                        <div className="h-12 w-12 rounded border overflow-hidden flex-shrink-0">
+                          <img 
+                            src={getThumbnailUrl(doc)} 
+                            alt={doc.name}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-12 w-12 rounded border bg-muted flex items-center justify-center flex-shrink-0">
+                          <FileImage className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium">{doc.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(doc.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex space-x-2">
                       <Button 
