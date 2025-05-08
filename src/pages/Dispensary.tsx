@@ -63,7 +63,7 @@ const formatNumber = (value: any): string => {
   return isNaN(num) ? '0.00' : num.toFixed(2);
 };
 
-// Helper function to normalize input with comma or dot
+// Improved helper function to normalize input with comma or dot
 const normalizeDecimalInput = (value: string): number => {
   // Replace comma with dot for calculation
   const normalizedValue = value.replace(',', '.');
@@ -224,6 +224,7 @@ const Dispensary = () => {
       const calculatedAmount = value / product.price;
       setCalculatedGrams(parseFloat(calculatedAmount.toFixed(2)));
       form.setValue('calculatedGrams', parseFloat(calculatedAmount.toFixed(2)));
+      // Also set the initial actual grams to match calculated
       setActualGrams(parseFloat(calculatedAmount.toFixed(2)));
       form.setValue('actualGrams', parseFloat(calculatedAmount.toFixed(2)));
     }
@@ -233,7 +234,7 @@ const Dispensary = () => {
   const updateActualGrams = (value: number) => {
     setActualGrams(value);
     form.setValue('actualGrams', value);
-    // We don't update the desired price here - it stays the same
+    // Important: We don't update the desired price here - it stays the same
   };
 
   // Confirmar eliminación de dispensación
@@ -620,7 +621,9 @@ const Dispensary = () => {
                               inputMode="decimal"
                               value={field.value}
                               onChange={(e) => {
-                                const value = normalizeDecimalInput(e.target.value);
+                                // Allow both . and , as decimal separators
+                                const inputValue = e.target.value.replace(/,/g, '.');
+                                const value = parseFloat(inputValue) || 0;
                                 field.onChange(value);
                                 updateDesiredPrice(value);
                               }}
@@ -672,7 +675,10 @@ const Dispensary = () => {
                               inputMode="decimal"
                               value={field.value}
                               onChange={(e) => {
-                                const value = normalizeDecimalInput(e.target.value);
+                                // Improved handling of decimal input
+                                // Allow both comma and period as decimal separators
+                                const inputValue = e.target.value.replace(/,/g, '.');
+                                const value = parseFloat(inputValue) || 0;
                                 field.onChange(value);
                                 updateActualGrams(value);
                               }}
