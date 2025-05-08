@@ -37,27 +37,39 @@ const Members = () => {
     try {
       let allMembers = await db.members.toArray();
       
-      // Ensure all members have memberCode
+      // Ensure all members have default values for essential properties
+      allMembers = allMembers.map(member => ({
+        ...member,
+        memberCode: member.memberCode || '',
+        consumptionGrams: member.consumptionGrams || 0,
+        balance: member.balance || 0
+      }));
+      
+      // Generate member codes for those who don't have one
       let hasChanges = false;
       for (const member of allMembers) {
         if (!member.memberCode && member.id) {
-          const code = await db.generateMemberCode(member.firstName, member.lastName);
-          await db.members.update(member.id, { memberCode: code });
-          hasChanges = true;
+          try {
+            const code = await db.generateMemberCode(member.firstName, member.lastName);
+            await db.members.update(member.id, { memberCode: code });
+            hasChanges = true;
+          } catch (error) {
+            console.error('Error generating member code:', error);
+          }
         }
       }
       
       // Reload if changes were made
       if (hasChanges) {
         allMembers = await db.members.toArray();
+        // Apply default values again for the reloaded data
+        allMembers = allMembers.map(member => ({
+          ...member,
+          memberCode: member.memberCode || '',
+          consumptionGrams: member.consumptionGrams || 0,
+          balance: member.balance || 0
+        }));
       }
-      
-      // Add default values for missing properties
-      allMembers = allMembers.map(member => ({
-        ...member,
-        consumptionGrams: member.consumptionGrams || 0,
-        balance: member.balance || 0
-      }));
       
       allMembers.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -193,7 +205,7 @@ const Members = () => {
                   {filteredMembers.length > 0 ? (
                     filteredMembers.map((member) => (
                       <TableRow key={member.id}>
-                        <TableCell className="font-mono">{member.memberCode}</TableCell>
+                        <TableCell className="font-mono">{member.memberCode || '-'}</TableCell>
                         <TableCell>{member.dni}</TableCell>
                         <TableCell>{member.firstName}</TableCell>
                         <TableCell>{member.lastName}</TableCell>

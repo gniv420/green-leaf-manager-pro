@@ -198,24 +198,31 @@ class CannabisDexie extends Dexie {
     
     const baseCode = firstInitial + lastInitials;
     
-    // Find if there are existing codes with these initials
-    const existingMembers = await this.members
-      .filter(member => member.memberCode.startsWith(baseCode))
-      .toArray();
-    
-    if (existingMembers.length === 0) {
-      return baseCode + "1";
-    } else {
-      // Find the highest number and increment it
-      let highestNum = 0;
-      for (const member of existingMembers) {
-        const numPart = member.memberCode.substring(baseCode.length);
-        const num = parseInt(numPart);
-        if (!isNaN(num) && num > highestNum) {
-          highestNum = num;
+    try {
+      // Find if there are existing codes with these initials
+      const existingMembers = await this.members
+        .filter(member => member.memberCode && member.memberCode.startsWith(baseCode))
+        .toArray();
+      
+      if (existingMembers.length === 0) {
+        return baseCode + "1";
+      } else {
+        // Find the highest number and increment it
+        let highestNum = 0;
+        for (const member of existingMembers) {
+          if (member.memberCode) {
+            const numPart = member.memberCode.substring(baseCode.length);
+            const num = parseInt(numPart);
+            if (!isNaN(num) && num > highestNum) {
+              highestNum = num;
+            }
+          }
         }
+        return baseCode + (highestNum + 1);
       }
-      return baseCode + (highestNum + 1);
+    } catch (error) {
+      console.error("Error generating member code:", error);
+      return baseCode + "1"; // Fallback in case of error
     }
   }
 
