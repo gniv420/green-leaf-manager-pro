@@ -48,15 +48,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
+      console.log("Intento de login con:", username, password); // Para depuración
       const user = await db.users.where('username').equals(username).first();
+      console.log("Usuario encontrado:", user); // Para depuración
       
       if (user && user.password === password) {
         setCurrentUser(user);
         // Store user in localStorage for persistence
         localStorage.setItem('currentUser', JSON.stringify(user));
+        
+        // Actualizar lastLogin
+        await db.users.update(user.id!, {
+          lastLogin: new Date()
+        });
+        
         toast({
           title: "¡Inicio de sesión exitoso!",
-          description: `Bienvenido, ${username}`,
+          description: `Bienvenido, ${user.fullName}`,
         });
         return true;
       } else {

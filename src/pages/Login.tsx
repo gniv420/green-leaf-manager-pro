@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Cannabis } from 'lucide-react';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('admin'); // Valor predeterminado para facilitar el inicio de sesión
+  const [password, setPassword] = useState('1234');  // Valor predeterminado para facilitar el inicio de sesión
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -19,10 +19,16 @@ const Login = () => {
     setIsLoggingIn(true);
     
     try {
+      console.log("Iniciando sesión con:", username, password); // Para depuración
       const success = await login(username, password);
       if (success) {
+        console.log("Login exitoso, redirigiendo..."); // Para depuración
         navigate('/dashboard');
+      } else {
+        console.log("Login fallido"); // Para depuración
       }
+    } catch (error) {
+      console.error("Error en login:", error); // Para depuración
     } finally {
       setIsLoggingIn(false);
     }
@@ -93,6 +99,12 @@ const Login = () => {
             </CardFooter>
           </form>
         </Card>
+        
+        {/* Credenciales de ayuda para desarrollo */}
+        <div className="mt-4 text-center text-sm text-gray-500">
+          <p>Usuario: admin</p>
+          <p>Contraseña: 1234</p>
+        </div>
       </div>
     </div>
   );
