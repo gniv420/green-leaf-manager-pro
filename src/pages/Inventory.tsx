@@ -6,7 +6,7 @@ import { db, Product } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Package, Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -32,7 +32,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Switch } from '@/components/ui/switch';
 import { useForm } from 'react-hook-form';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Inventory = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,6 +42,7 @@ const Inventory = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   const products = useLiveQuery(
     async () => {
@@ -65,6 +68,7 @@ const Inventory = () => {
       costPrice: 0,
       price: 0,
       stockGrams: 0,
+      isVisible: true
     }
   });
 
@@ -77,6 +81,7 @@ const Inventory = () => {
         costPrice: editingProduct.costPrice || 0,
         price: editingProduct.price,
         stockGrams: editingProduct.stockGrams,
+        isVisible: editingProduct.isVisible !== false // Default to true if not set
       });
     } else {
       form.reset({
@@ -86,6 +91,7 @@ const Inventory = () => {
         costPrice: 0,
         price: 0,
         stockGrams: 0,
+        isVisible: true
       });
     }
   }, [editingProduct, form]);
@@ -114,6 +120,29 @@ const Inventory = () => {
       toast({
         title: "Error",
         description: "No se pudo eliminar el producto",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleProductVisibility = async (product: Product) => {
+    if (!product.id) return;
+
+    try {
+      const newVisibility = !product.isVisible;
+      await db.products.update(product.id, {
+        isVisible: newVisibility
+      });
+
+      toast({
+        title: newVisibility ? "Producto visible" : "Producto oculto",
+        description: `El producto ahora está ${newVisibility ? "visible" : "oculto"} en dispensario`,
+      });
+    } catch (error) {
+      console.error("Error al cambiar visibilidad:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo cambiar la visibilidad del producto",
         variant: "destructive",
       });
     }
@@ -152,14 +181,19 @@ const Inventory = () => {
     }
   };
 
+  // Check if user has admin permissions
+  const isAdmin = currentUser?.isAdmin === true;
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Inventario</h1>
-        <Button onClick={handleOpenAddDialog}>
-          <Plus className="mr-2" />
-          Añadir Producto
-        </Button>
+        {isAdmin && (
+          <Button onClick={handleOpenAddDialog}>
+            <Plus className="mr-2" />
+            Añadir Producto
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -185,17 +219,17 @@ const Inventory = () => {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Categoría</TableHead>
-                  <TableHead>Precio Coste</TableHead>
                   <TableHead>Precio Dispensación</TableHead>
                   <TableHead>Stock (g)</TableHead>
-                  <TableHead>Beneficio</TableHead>
+                  <TableHead>Visible</TableHead>
+                  {isAdmin && <TableHead>Precio Coste</TableHead>}
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {products?.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
+                    <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">
                       No hay productos registrados.
                     </TableCell>
                   </TableRow>
@@ -204,7 +238,6 @@ const Inventory = () => {
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>{(product.costPrice || 0).toFixed(2)}€</TableCell>
                     <TableCell>{product.price.toFixed(2)}€</TableCell>
                     <TableCell>
                       <span className={product.stockGrams < 10 ? "text-destructive font-medium" : ""}>
@@ -212,18 +245,36 @@ const Inventory = () => {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {product.costPrice !== undefined ? (
-                        ((product.price - product.costPrice) / product.costPrice * 100).toFixed(2) + "%"
-                      ) : "N/A"}
+                      {product.isVisible !== false ? 
+                        <span className="text-green-500">Visible</span> : 
+                        <span className="text-red-500">Oculto</span>
+                      }
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell>{(product.costPrice || 0).toFixed(2)}€</TableCell>
+                    )}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => handleOpenEditDialog(product)}>
-                          <Edit className="h-4 w-4" />
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => toggleProductVisibility(product)}
+                        >
+                          {product.isVisible !== false ? 
+                            <EyeOff className="h-4 w-4" /> : 
+                            <Eye className="h-4 w-4" />
+                          }
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(product.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => handleOpenEditDialog(product)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(product.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -318,6 +369,26 @@ const Inventory = () => {
                       <Input {...field} type="number" step="0.01" min="0" />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="isVisible"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Visible en dispensario</FormLabel>
+                      <FormDescription>
+                        Este producto será visible para dispensar
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />

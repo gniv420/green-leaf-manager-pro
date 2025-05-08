@@ -3,9 +3,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, UserRound, Cannabis, Plus, Minus } from 'lucide-react';
+import { Eye, EyeOff, UserRound, Cannabis, Plus, Minus, Phone } from 'lucide-react';
 import { Member } from '@/lib/db';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 
 interface MemberCardProps {
   member: Member;
@@ -60,6 +59,10 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Fecha de nacimiento:</span>
             <span className="font-medium">{maskedValue(new Date(member.dob).toLocaleDateString())}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Teléfono:</span>
+            <span className="font-medium">{maskedValue(member.phone || '666666666')}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Consumo mensual:</span>

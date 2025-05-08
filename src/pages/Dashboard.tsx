@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { db, Member, CashRegister, Product } from '@/lib/db';
+import { db, Member, Product, Dispensary } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, User, Database, Cannabis, CircleDollarSign, BarChart, DollarSign, Coins } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -42,16 +42,30 @@ const Dashboard = () => {
     
   const todayBalance = todayIncome - todayExpenses;
   
-  // Using the properly indexed stockGrams field
-  const lowStockProducts = useLiveQuery(async () => {
+  // Recent dispensary records
+  const recentDispensations = useLiveQuery(async () => {
     try {
-      console.log("Querying low stock products");
-      return await db.products
-        .where('stockGrams')
-        .below(50)
+      // Get 5 most recent dispensary records with member and product info
+      const dispensations = await db.dispensary
+        .orderBy('createdAt')
+        .reverse()
+        .limit(5)
         .toArray();
+      
+      // Fetch associated members and products
+      const result = await Promise.all(dispensations.map(async (dispensation) => {
+        const member = await db.members.get(dispensation.memberId);
+        const product = await db.products.get(dispensation.productId);
+        return {
+          ...dispensation,
+          member,
+          product
+        };
+      }));
+      
+      return result.filter(r => r.member && r.product);
     } catch (error) {
-      console.error("Error fetching low stock products:", error);
+      console.error("Error fetching recent dispensations:", error);
       return [];
     }
   });
@@ -234,42 +248,45 @@ const Dashboard = () => {
           </CardContent>
         </Card>
         
-        {/* Productos con bajo stock */}
+        {/* Recent Dispensations */}
         <Card>
           <CardHeader>
-            <CardTitle>Productos con bajo stock</CardTitle>
+            <CardTitle>Dispensaciones recientes</CardTitle>
             <CardDescription>
-              Productos con menos de 50g en inventario
+              Las últimas dispensaciones realizadas
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {lowStockProducts && lowStockProducts.length > 0 ? (
+            {recentDispensations && recentDispensations.length > 0 ? (
               <div className="space-y-2">
-                {lowStockProducts.map((product) => (
-                  <Link
-                    key={product.id}
-                    to="/inventory"
-                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted"
+                {recentDispensations.map((dispensation) => (
+                  <div
+                    key={dispensation.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
                   >
                     <div className="grid gap-1">
                       <p className="font-medium">
-                        {product.name}
+                        {dispensation.member?.firstName} {dispensation.member?.lastName}
                       </p>
                       <div className="text-sm text-muted-foreground">
-                        {product.category}
+                        {dispensation.product?.name} - {dispensation.quantity}g
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        <span className="font-mono">Pago: {dispensation.paymentMethod === 'cash' ? 'Efectivo' : dispensation.paymentMethod === 'bizum' ? 'Bizum' : 'Monedero'}</span>
                       </div>
                     </div>
-                    <div className={`text-sm font-medium ${
-                      product.stockGrams < 10 ? 'text-red-600' : 'text-amber-600'
-                    }`}>
-                      {product.stockGrams.toFixed(2)}g
+                    <div className="flex flex-col items-end">
+                      <div className="font-medium text-green-600">{dispensation.price}€</div>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(dispensation.createdAt).toLocaleString()}
+                      </div>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             ) : (
               <p className="py-6 text-center text-muted-foreground">
-                No hay productos con bajo stock
+                No hay dispensaciones recientes
               </p>
             )}
           </CardContent>

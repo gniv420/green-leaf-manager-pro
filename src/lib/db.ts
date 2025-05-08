@@ -16,6 +16,7 @@ export interface Member {
   memberCode: string; // Código alfanumérico único
   dob: Date;
   dni: string;
+  phone: string; // Added phone field
   consumptionGrams: number;
   sponsorId: number | null;
   balance: number;
@@ -41,6 +42,7 @@ export interface Product {
   costPrice: number;
   price: number;
   stockGrams: number;
+  isVisible: boolean; // Added isVisible field
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,6 +75,7 @@ export interface Dispensary {
   productId: number;
   quantity: number; // en gramos
   price: number; // precio de venta
+  paymentMethod: 'cash' | 'bizum' | 'wallet'; // Added payment method
   notes: string;
   userId: number; // Usuario que registra
   createdAt: Date;
@@ -86,6 +89,11 @@ export interface MemberTransaction {
   notes: string;
   userId: number; // Usuario que registra
   createdAt: Date;
+}
+
+// Added new interface for cash register transactions with payment methods
+export interface CashRegisterTransaction extends CashTransaction {
+  paymentMethod: 'cash' | 'bizum' | 'wallet';
 }
 
 // Create the database class
@@ -102,20 +110,23 @@ class CannabisDexie extends Dexie {
   constructor() {
     super('cannabisAssociationDB');
     
-    // Update version and add index for stockGrams
-    this.version(6).stores({
+    // Update version and add phone field to members, isVisible to products
+    this.version(7).stores({
       users: '++id, username, createdAt',
-      members: '++id, firstName, lastName, memberCode, dni, sponsorId, createdAt',
+      members: '++id, firstName, lastName, memberCode, dni, phone, sponsorId, createdAt',
       documents: '++id, memberId, createdAt',
-      products: '++id, name, category, stockGrams, createdAt', // Added stockGrams index
-      cashTransactions: '++id, type, cashRegisterId, createdAt',
+      products: '++id, name, category, stockGrams, isVisible, createdAt', // Added isVisible index
+      cashTransactions: '++id, type, cashRegisterId, paymentMethod, createdAt',
       cashRegisters: '++id, status, openedAt, closedAt',
-      dispensary: '++id, memberId, productId, createdAt',
+      dispensary: '++id, memberId, productId, paymentMethod, createdAt',
       memberTransactions: '++id, memberId, type, createdAt'
     });
 
-    // Initialize with admin user if it doesn't exist
-    this.on('ready', () => this.initializeAdminUser());
+    // Initialize with admin user and migrate existing data
+    this.on('ready', async () => {
+      await this.initializeAdminUser();
+      await this.migrateData();
+    });
   }
 
   async initializeAdminUser() {
@@ -127,6 +138,53 @@ class CannabisDexie extends Dexie {
         isAdmin: true,
         createdAt: new Date()
       });
+    }
+  }
+
+  // Migrate existing data to new schema
+  async migrateData() {
+    try {
+      // Add phone number to existing members
+      const members = await this.members.toArray();
+      for (const member of members) {
+        if (member.id && !member.phone) {
+          await this.members.update(member.id, {
+            phone: '666666666' // Default test phone number
+          });
+        }
+      }
+
+      // Add isVisible flag to existing products
+      const products = await this.products.toArray();
+      for (const product of products) {
+        if (product.id && product.isVisible === undefined) {
+          await this.products.update(product.id, {
+            isVisible: true
+          });
+        }
+      }
+
+      // Add payment method to existing dispensary records
+      const dispensaryRecords = await this.dispensary.toArray();
+      for (const record of dispensaryRecords) {
+        if (record.id && !record.paymentMethod) {
+          await this.dispensary.update(record.id, {
+            paymentMethod: 'cash' // Default payment method
+          });
+        }
+      }
+
+      // Add payment method to existing cash transactions
+      const cashTransactions = await this.cashTransactions.toArray();
+      for (const transaction of cashTransactions) {
+        if (transaction.id && !(transaction as CashRegisterTransaction).paymentMethod) {
+          await this.cashTransactions.update(transaction.id, {
+            paymentMethod: 'cash' // Default payment method
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Migration error:', error);
     }
   }
 
@@ -196,6 +254,7 @@ CREATE TABLE IF NOT EXISTS members (
   memberCode TEXT NOT NULL UNIQUE,
   dob TEXT NOT NULL,
   dni TEXT NOT NULL UNIQUE,
+  phone TEXT NOT NULL,
   consumptionGrams REAL NOT NULL,
   sponsorId INTEGER NULL,
   balance REAL NOT NULL DEFAULT 0,
@@ -224,6 +283,7 @@ CREATE TABLE IF NOT EXISTS products (
   costPrice REAL NOT NULL,
   price REAL NOT NULL,
   stockGrams REAL NOT NULL,
+  isVisible REAL NOT NULL DEFAULT 1,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
 );
@@ -250,6 +310,7 @@ CREATE TABLE IF NOT EXISTS cashTransactions (
   notes TEXT NOT NULL,
   userId INTEGER NOT NULL,
   cashRegisterId INTEGER NULL,
+  paymentMethod TEXT NOT NULL,
   createdAt TEXT NOT NULL,
   FOREIGN KEY (userId) REFERENCES users(id) ON DELETE RESTRICT,
   FOREIGN KEY (cashRegisterId) REFERENCES cashRegisters(id) ON DELETE SET NULL
@@ -262,6 +323,7 @@ CREATE TABLE IF NOT EXISTS dispensary (
   productId INTEGER NOT NULL,
   quantity REAL NOT NULL,
   price REAL NOT NULL,
+  paymentMethod TEXT NOT NULL,
   notes TEXT NOT NULL,
   userId INTEGER NOT NULL,
   createdAt TEXT NOT NULL,
@@ -280,8 +342,8 @@ CREATE TABLE IF NOT EXISTS dispensary (
 
     // Insert members data
     members.forEach(member => {
-      sqlScript += `INSERT INTO members (firstName, lastName, memberCode, dob, dni, consumptionGrams, sponsorId, balance, createdAt, updatedAt) 
-                   VALUES ('${member.firstName}', '${member.lastName}', '${member.memberCode || ""}', '${member.dob.toISOString()}', '${member.dni}', ${member.consumptionGrams}, ${member.sponsorId || 'NULL'}, ${member.balance || 0}, '${member.createdAt.toISOString()}', '${member.updatedAt.toISOString()}');\n`;
+      sqlScript += `INSERT INTO members (firstName, lastName, memberCode, dob, dni, phone, consumptionGrams, sponsorId, balance, createdAt, updatedAt) 
+                   VALUES ('${member.firstName}', '${member.lastName}', '${member.memberCode || ""}', '${member.dob.toISOString()}', '${member.dni}', '${member.phone}', ${member.consumptionGrams}, ${member.sponsorId || 'NULL'}, ${member.balance || 0}, '${member.createdAt.toISOString()}', '${member.updatedAt.toISOString()}');\n`;
     });
 
     // Insert documents data (truncating binary data)
@@ -293,8 +355,8 @@ CREATE TABLE IF NOT EXISTS dispensary (
 
     // Insert products data
     products.forEach(product => {
-      sqlScript += `INSERT INTO products (name, category, description, costPrice, price, stockGrams, createdAt, updatedAt) 
-                   VALUES ('${product.name}', '${product.category}', '${product.description.replace(/'/g, "''")}', ${product.costPrice}, ${product.price}, ${product.stockGrams}, '${product.createdAt.toISOString()}', '${product.updatedAt.toISOString()}');\n`;
+      sqlScript += `INSERT INTO products (name, category, description, costPrice, price, stockGrams, isVisible, createdAt, updatedAt) 
+                   VALUES ('${product.name}', '${product.category}', '${product.description.replace(/'/g, "''")}', ${product.costPrice}, ${product.price}, ${product.stockGrams}, ${product.isVisible}, '${product.createdAt.toISOString()}', '${product.updatedAt.toISOString()}');\n`;
     });
 
     // Insert cashRegisters data
@@ -305,14 +367,14 @@ CREATE TABLE IF NOT EXISTS dispensary (
 
     // Insert cashTransactions data
     cashTransactions.forEach(transaction => {
-      sqlScript += `INSERT INTO cashTransactions (type, amount, concept, notes, userId, cashRegisterId, createdAt) 
-                   VALUES ('${transaction.type}', ${transaction.amount}, '${transaction.concept.replace(/'/g, "''")}', '${transaction.notes.replace(/'/g, "''")}', ${transaction.userId}, ${transaction.cashRegisterId || 'NULL'}, '${transaction.createdAt.toISOString()}');\n`;
+      sqlScript += `INSERT INTO cashTransactions (type, amount, concept, notes, userId, cashRegisterId, paymentMethod, createdAt) 
+                   VALUES ('${transaction.type}', ${transaction.amount}, '${transaction.concept.replace(/'/g, "''")}', '${transaction.notes.replace(/'/g, "''")}', ${transaction.userId}, ${transaction.cashRegisterId || 'NULL'}, '${transaction.paymentMethod}', '${transaction.createdAt.toISOString()}');\n`;
     });
 
     // Insert dispensary data
     dispensary.forEach(disp => {
-      sqlScript += `INSERT INTO dispensary (memberId, productId, quantity, price, notes, userId, createdAt) 
-                   VALUES (${disp.memberId}, ${disp.productId}, ${disp.quantity}, ${disp.price}, '${disp.notes.replace(/'/g, "''")}', ${disp.userId}, '${disp.createdAt.toISOString()}');\n`;
+      sqlScript += `INSERT INTO dispensary (memberId, productId, quantity, price, paymentMethod, notes, userId, createdAt) 
+                   VALUES (${disp.memberId}, ${disp.productId}, ${disp.quantity}, ${disp.price}, '${disp.paymentMethod}', '${disp.notes.replace(/'/g, "''")}', ${disp.userId}, '${disp.createdAt.toISOString()}');\n`;
     });
 
     return sqlScript;

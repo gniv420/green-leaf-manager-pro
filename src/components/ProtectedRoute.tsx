@@ -4,10 +4,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requiresAdmin?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiresAdmin = false }) => {
+  const { isAuthenticated, isLoading, currentUser } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -18,8 +19,22 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
+  // Not authenticated at all
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  // Check admin access if needed
+  if (requiresAdmin && !currentUser?.isAdmin) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center p-4">
+        <h1 className="text-3xl font-bold text-red-600">Acceso restringido</h1>
+        <p className="mt-4 text-center text-muted-foreground">
+          Necesitas permisos de administrador para acceder a esta página.
+        </p>
+        <Navigate to="/dashboard" replace />
+      </div>
+    );
   }
 
   return <>{children}</>;
