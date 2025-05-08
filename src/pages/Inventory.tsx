@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, Product } from '@/lib/db';
@@ -59,15 +60,25 @@ const Inventory = () => {
   const products = useLiveQuery(
     async () => {
       const allProducts = await db.products.toArray();
+      
+      // Ensure all products have proper number values for numeric fields
+      const normalizedProducts = allProducts.map(product => ({
+        ...product,
+        price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
+        costPrice: typeof product.costPrice === 'number' ? product.costPrice : Number(product.costPrice) || 0,
+        stockGrams: typeof product.stockGrams === 'number' ? product.stockGrams : Number(product.stockGrams) || 0,
+        isVisible: product.isVisible !== false // Default to true if not set
+      }));
+      
       if (searchQuery) {
         const lowerQuery = searchQuery.toLowerCase();
-        return allProducts.filter(
+        return normalizedProducts.filter(
           product => 
             product.name.toLowerCase().includes(lowerQuery) || 
             product.category.toLowerCase().includes(lowerQuery)
         );
       }
-      return allProducts;
+      return normalizedProducts;
     },
     [searchQuery]
   );
@@ -162,9 +173,17 @@ const Inventory = () => {
 
   const onSubmit = async (data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
+      // Ensure numeric values are properly converted to numbers
+      const productData = {
+        ...data,
+        price: Number(data.price),
+        costPrice: Number(data.costPrice),
+        stockGrams: Number(data.stockGrams)
+      };
+      
       if (editingProduct?.id) {
         await db.products.update(editingProduct.id, {
-          ...data,
+          ...productData,
           updatedAt: new Date()
         });
         toast({
@@ -173,7 +192,7 @@ const Inventory = () => {
         });
       } else {
         await db.products.add({
-          ...data,
+          ...productData,
           createdAt: new Date(),
           updatedAt: new Date()
         });
@@ -195,6 +214,12 @@ const Inventory = () => {
 
   // Check if user has admin permissions
   const isAdmin = currentUser?.isAdmin === true;
+
+  // Function to safely format numbers
+  const formatNumber = (value: any): string => {
+    const num = typeof value === 'number' ? value : Number(value);
+    return isNaN(num) ? '0.00' : num.toFixed(2);
+  };
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -250,10 +275,10 @@ const Inventory = () => {
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>{product.price.toFixed(2)}€</TableCell>
+                    <TableCell>{formatNumber(product.price)}€</TableCell>
                     <TableCell>
                       <span className={product.stockGrams < 10 ? "text-destructive font-medium" : ""}>
-                        {product.stockGrams.toFixed(2)}g
+                        {formatNumber(product.stockGrams)}g
                       </span>
                     </TableCell>
                     <TableCell>
@@ -263,7 +288,7 @@ const Inventory = () => {
                       }
                     </TableCell>
                     {isAdmin && (
-                      <TableCell>{(product.costPrice || 0).toFixed(2)}€</TableCell>
+                      <TableCell>{formatNumber(product.costPrice || 0)}€</TableCell>
                     )}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
