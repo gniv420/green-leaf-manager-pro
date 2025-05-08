@@ -132,6 +132,7 @@ const MemberDetails = () => {
         notes: `Socio: ${member.firstName} ${member.lastName} - ${transactionNotes}`,
         userId,
         cashRegisterId: currentCashRegister.id,
+        paymentMethod: 'cash', // Añadimos el método de pago por defecto
         createdAt: new Date()
       });
       
