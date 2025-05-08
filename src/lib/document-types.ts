@@ -17,6 +17,7 @@ export interface Document {
   size: number;
   data: ArrayBuffer | string;
   uploadDate: Date;
+  createdAt: Date;
   notes?: string;
 }
 

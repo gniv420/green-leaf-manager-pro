@@ -1,5 +1,7 @@
+
 import { useState, useEffect, useRef } from 'react';
-import { db, Document as DBDocument } from '@/lib/db';
+import { db, Document } from '@/lib/db';
+import { DocumentType } from '@/lib/document-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +22,7 @@ interface DocumentsSectionProps {
 }
 
 const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
-  const [documents, setDocuments] = useState<DBDocument[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [newDocumentName, setNewDocumentName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -94,9 +96,13 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
       const docId = await db.documents.add({
         memberId,
         name: newDocumentName,
-        type: selectedFile.type,
+        type: 'other' as DocumentType,
+        fileName: selectedFile.name,
+        contentType: selectedFile.type,
+        size: selectedFile.size,
         data: base64,
-        createdAt: new Date(),
+        uploadDate: new Date(),
+        createdAt: new Date()
       });
 
       // Refresh documents list
@@ -137,12 +143,12 @@ const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
     });
   };
 
-  const handleDownload = (doc: DBDocument) => {
+  const handleDownload = (doc: Document) => {
     try {
       const link = doc.data;
       const a = window.document.createElement('a');
-      a.href = link;
-      a.download = doc.name;
+      a.href = link.toString();
+      a.download = doc.fileName;
       window.document.body.appendChild(a);
       a.click();
       window.document.body.removeChild(a);

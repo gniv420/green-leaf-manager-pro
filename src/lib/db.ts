@@ -1,7 +1,20 @@
+
 import Dexie, { Table } from 'dexie';
 
 import { ProductType } from './product-types';
 import { Document } from './document-types';
+
+export { Document } from './document-types';
+
+export interface User {
+  id?: number;
+  username: string;
+  password: string;
+  fullName: string;
+  isAdmin: boolean;
+  createdAt: Date;
+  lastLogin?: Date;
+}
 
 export interface Member {
   id?: number;
@@ -20,8 +33,19 @@ export interface Member {
   notes?: string;
   status: 'active' | 'inactive' | 'pending';
   balance?: number;
+  sponsorId?: number | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface MemberTransaction {
+  id?: number;
+  memberId: number;
+  amount: number;
+  type: 'deposit' | 'withdrawal';
+  notes?: string;
+  userId: number;
+  createdAt: Date;
 }
 
 export interface Product {
@@ -31,7 +55,9 @@ export interface Product {
   category: string;
   type: ProductType;
   price: number;
+  costPrice?: number;
   stockGrams: number;
+  isVisible?: boolean;
   image?: string;
   notes?: string;
   createdAt: Date;
@@ -57,7 +83,12 @@ export interface CashRegister {
   initialBalance: number;
   finalBalance?: number;
   status: 'open' | 'closed';
+  openingAmount: number;
+  closingAmount?: number;
+  userId: number;
   notes?: string;
+  openedAt: Date;
+  closedAt?: Date;
 }
 
 export interface CashTransaction {
@@ -79,6 +110,8 @@ class ClubDatabase extends Dexie {
   cashRegisters!: Table<CashRegister>;
   cashTransactions!: Table<CashTransaction>;
   documents!: Table<Document>;
+  users!: Table<User>;
+  memberTransactions!: Table<MemberTransaction>;
 
   constructor() {
     super("ClubDatabase");
@@ -88,26 +121,67 @@ class ClubDatabase extends Dexie {
       products: "++id, name, category, type",
       dispensary: "++id, memberId, productId, createdAt",
       cashRegisters: "++id, openDate, closeDate, status",
-      cashTransactions: "++id, cashRegisterId, type, createdAt"
+      cashTransactions: "++id, cashRegisterId, type, createdAt",
+      users: "++id, username"
     });
     
     // Añadimos la tabla de documentos en la versión 2
     this.version(2).stores({
       documents: "++id, memberId, type, uploadDate"
     });
+
+    // Añadimos la tabla de transacciones de miembros en la versión 3
+    this.version(3).stores({
+      memberTransactions: "++id, memberId, createdAt, type"
+    });
+  }
+
+  // Helper method to generate member codes
+  async generateMemberCode(firstName: string, lastName: string): Promise<string> {
+    const date = new Date();
+    const year = date.getFullYear().toString().substring(2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    
+    // Get first letters of first and last name
+    const firstInitial = firstName.charAt(0).toUpperCase();
+    const lastInitial = lastName.charAt(0).toUpperCase();
+    
+    // Get count of members for sequential numbering
+    const memberCount = await this.members.count();
+    const sequentialNumber = (memberCount + 1).toString().padStart(3, '0');
+    
+    return `${year}${month}-${firstInitial}${lastInitial}${sequentialNumber}`;
+  }
+
+  // Method to export database as SQLite (stub for type checking)
+  async exportAsSQLite(): Promise<Blob> {
+    // This would be implemented with actual functionality
+    console.log("Exporting database as SQLite...");
+    return new Blob(['SQLite export data would go here'], { type: 'application/x-sqlite3' });
   }
 }
 
 export const db = new ClubDatabase();
 
 db.on('populate', async () => {
+  // Add initial admin user
+  await db.users.add({
+    username: 'admin',
+    password: 'admin',
+    fullName: 'Administrator',
+    isAdmin: true,
+    createdAt: new Date()
+  });
+
   const initialProducts = [
     {
       name: 'Amnesia Haze',
       category: 'Flor',
       type: 'sativa' as ProductType,
       price: 8.50,
+      costPrice: 6.00,
       stockGrams: 50,
+      isVisible: true,
       createdAt: new Date(),
       updatedAt: new Date()
     },
@@ -117,7 +191,9 @@ db.on('populate', async () => {
       category: 'Flor',
       type: 'indica' as ProductType,
       price: 9.00,
+      costPrice: 6.50,
       stockGrams: 30,
+      isVisible: true,
       createdAt: new Date(),
       updatedAt: new Date()
     },
@@ -126,7 +202,9 @@ db.on('populate', async () => {
       category: 'Flor',
       type: 'hibrido' as ProductType,
       price: 8.00,
+      costPrice: 5.50,
       stockGrams: 40,
+      isVisible: true,
       createdAt: new Date(),
       updatedAt: new Date()
     },
@@ -135,7 +213,9 @@ db.on('populate', async () => {
       category: 'Flor',
       type: 'hibrido' as ProductType,
       price: 9.50,
+      costPrice: 7.00,
       stockGrams: 25,
+      isVisible: true,
       createdAt: new Date(),
       updatedAt: new Date()
     },
@@ -144,7 +224,9 @@ db.on('populate', async () => {
       category: 'Flor',
       type: 'indica' as ProductType,
       price: 8.75,
+      costPrice: 6.25,
       stockGrams: 35,
+      isVisible: true,
       createdAt: new Date(),
       updatedAt: new Date()
     },
