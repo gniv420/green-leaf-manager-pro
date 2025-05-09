@@ -199,7 +199,8 @@ const MemberDetails = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const { memberId } = useParams<{ memberId: string }>();
+  const params = useParams<{ id: string }>();
+  const memberId = params.id;
   
   debugMemberDetails('Component rendering', { memberId, path: location.pathname });
 

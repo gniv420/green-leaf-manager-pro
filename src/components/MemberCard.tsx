@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,15 +62,8 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
       const url = `/members/${member.id}`;
       console.log("Navigation URL:", url);
       
-      // Try with different navigation methods to see if one works
-      try {
-        console.log("Using navigate() method");
-        navigate(url);
-      } catch (error) {
-        console.error("Navigation error:", error);
-        console.log("Trying fallback navigation with window.location");
-        window.location.href = url;
-      }
+      // Use correct navigation
+      navigate(url);
     } else {
       console.error("Member ID is undefined, cannot navigate");
     }
