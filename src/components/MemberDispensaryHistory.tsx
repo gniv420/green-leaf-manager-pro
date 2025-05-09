@@ -73,7 +73,9 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
   // Calcular totales
   const totalDispensed = dispensaryRecords.reduce((sum, record) => sum + record.quantity, 0);
   const totalSpent = dispensaryRecords.reduce((sum, record) => sum + record.price, 0);
-  const currentBalance = member?.balance || 0;
+  
+  // Asegurar que currentBalance siempre sea un número, con valor predeterminado 0
+  const currentBalance = member?.balance ?? 0;
 
   return (
     <div className="space-y-4">
