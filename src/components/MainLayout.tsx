@@ -44,6 +44,8 @@ export const MainLayout = () => {
   const { associationName, logoPreview } = useSettings();
   const { toggleSidebar, state } = useSidebar();
   
+  console.log("MainLayout rendering, current path:", pathname);
+  
   const sidebarItems: SidebarItem[] = [
     {
       title: "Dashboard",

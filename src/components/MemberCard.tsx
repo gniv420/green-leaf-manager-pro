@@ -54,21 +54,26 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
   const handleDetailsClick = () => {
     if (member.id) {
       console.log("Navigating to member details with ID:", member.id);
-      navigate(`/members/${member.id}`);
+      const url = `/members/${member.id}`;
+      console.log("Navigation URL:", url);
+      navigate(url);
     } else {
       console.error("Member ID is undefined, cannot navigate");
     }
   };
 
   return (
-    <Card className={`h-full transition-colors ${theme === 'dark' ? 'bg-secondary/20' : ''}`}>
+    <Card className={`h-full transition-colors ${theme === 'dark' ? 'bg-secondary/20' : ''}`} onClick={handleDetailsClick}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>
             <CardTitle className="text-xl">{member.firstName} {member.lastName}</CardTitle>
             <p className="text-sm font-mono text-muted-foreground">{member.memberCode}</p>
           </div>
-          <Button size="icon" variant="ghost" onClick={toggleSensitiveInfo}>
+          <Button size="icon" variant="ghost" onClick={(e) => {
+            e.stopPropagation(); // Prevent card click
+            toggleSensitiveInfo();
+          }}>
             {showSensitiveInfo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
         </div>
