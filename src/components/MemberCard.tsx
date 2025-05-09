@@ -50,6 +50,16 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
   // Ensure balance is always a number
   const balance = member.balance ?? 0;
 
+  // Explicit navigation to member details with proper ID
+  const handleDetailsClick = () => {
+    if (member.id) {
+      console.log("Navigating to member details with ID:", member.id);
+      navigate(`/members/${member.id}`);
+    } else {
+      console.error("Member ID is undefined, cannot navigate");
+    }
+  };
+
   return (
     <Card className={`h-full transition-colors ${theme === 'dark' ? 'bg-secondary/20' : ''}`}>
       <CardHeader className="pb-2">
@@ -113,7 +123,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
         <Button 
           variant="default" 
           className="w-full bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
-          onClick={() => navigate(`/members/${member.id}`)}
+          onClick={handleDetailsClick}
         >
           <UserRound className="mr-2 h-4 w-4" />
           Detalles

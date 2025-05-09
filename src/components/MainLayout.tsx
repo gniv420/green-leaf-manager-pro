@@ -98,6 +98,11 @@ export const MainLayout = () => {
     logout();
     navigate("/login");
   };
+  
+  const handleNavigation = (path: string) => {
+    console.log(`Navigation: Navigating to ${path}`);
+    navigate(path);
+  };
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -125,7 +130,7 @@ export const MainLayout = () => {
                       isActive={isActive}
                       tooltip={item.title}
                     >
-                      <Link to={item.path}>
+                      <Link to={item.path} onClick={() => console.log(`Clicked on: ${item.path}`)}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>
