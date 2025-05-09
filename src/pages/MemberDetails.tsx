@@ -1002,10 +1002,45 @@ const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes
   };
 
   return (
-    <Form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit}>
       <div className="grid gap-4 py-4">
         <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="documentType" className="text-right">
             Tipo de Documento
           </Label>
-          <Select onValueChange={setSelected
+          <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
+            <SelectTrigger className="col-span-3">
+              <SelectValue placeholder="Seleccionar tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              {documentTypes?.map((type) => (
+                <SelectItem key={type.id} value={type.name}>
+                  {type.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="file" className="text-right">
+            Archivo
+          </Label>
+          <Input
+            id="file"
+            type="file"
+            className="col-span-3"
+            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button type="submit">Subir</Button>
+      </DialogFooter>
+    </form>
+  );
+};
+
+export default MemberDetails;
