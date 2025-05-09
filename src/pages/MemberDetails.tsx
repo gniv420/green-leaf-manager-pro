@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -56,6 +57,7 @@ import { formatDecimal } from '@/lib/utils';
 import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
 import { ImageIcon } from 'lucide-react';
 import { DocumentType } from '@/lib/document-types';
+import { openDocument, releaseDocumentUrl } from '@/lib/document-viewer';
 
 const formSchema = z.object({
   firstName: z.string().min(2, {
@@ -183,6 +185,7 @@ const MemberDetails = () => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
   const [currentDocumentUrl, setCurrentDocumentUrl] = useState<string | null>(null);
+  const [currentDocument, setCurrentDocument] = useState<any>(null);
   const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
   // Añadir estado para el diálogo de ajuste de saldo
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false);
@@ -194,7 +197,7 @@ const MemberDetails = () => {
   const member = useLiveQuery(async () => {
     if (!memberId) return undefined;
     return await db.members.get(parseInt(memberId));
-  });
+  }, [memberId]);
 
   const dispensaryHistory = useLiveQuery(async () => {
     if (!memberId) return [];
@@ -203,9 +206,9 @@ const MemberDetails = () => {
       .equals(parseInt(memberId))
       .reverse()
       .sortBy('createdAt');
-  });
+  }, [memberId]);
 
-  const documentTypes = useLiveQuery(() => db.documents.toArray());
+  const documentTypes = useLiveQuery(() => db.documents.toArray(), []);
 
   const documents = useLiveQuery(async () => {
     if (!memberId) return [];
@@ -213,7 +216,7 @@ const MemberDetails = () => {
       .where('memberId')
       .equals(parseInt(memberId))
       .toArray();
-  });
+  }, [memberId]);
 
   // Obtenemos el registro de caja abierta para validar
   const currentCashRegister = useLiveQuery(() => {
@@ -264,6 +267,40 @@ const MemberDetails = () => {
       });
     }
   }, [member, form]);
+
+  // Clean up document URL when component unmounts or when URL changes
+  useEffect(() => {
+    return () => {
+      if (currentDocumentUrl) {
+        releaseDocumentUrl(currentDocumentUrl);
+      }
+    };
+  }, [currentDocumentUrl]);
+
+  const handleViewDocument = async (doc: any) => {
+    try {
+      // Generate URL from document data
+      const url = openDocument(doc);
+      if (url) {
+        setCurrentDocumentUrl(url);
+        setCurrentDocument(doc);
+        setIsDocumentViewOpen(true);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudo abrir el documento."
+        });
+      }
+    } catch (error) {
+      console.error("Error al abrir el documento:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error al abrir el documento."
+      });
+    }
+  };
 
   const handleConfirmDeleteDocument = (documentId?: number) => {
     if (!documentId) return;
@@ -337,9 +374,6 @@ const MemberDetails = () => {
     if (!memberId || !file) return;
 
     try {
-      // Mock URL instead of actual Firebase upload
-      const url = URL.createObjectURL(file);
-
       // Guardar la referencia en la base de datos
       await db.documents.add({
         memberId: parseInt(memberId),
@@ -887,10 +921,7 @@ const MemberDetails = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="flex justify-between">
-                          <Button variant="secondary" size="sm" onClick={() => {
-                            setCurrentDocumentUrl(doc.url || null);
-                            setIsDocumentViewOpen(true);
-                          }}>
+                          <Button variant="secondary" size="sm" onClick={() => handleViewDocument(doc)}>
                             <Eye className="mr-2 h-4 w-4" />
                             Ver
                           </Button>
@@ -964,18 +995,30 @@ const MemberDetails = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDocumentViewOpen} onOpenChange={() => setIsDocumentViewOpen(false)}>
+      <Dialog open={isDocumentViewOpen} onOpenChange={() => {
+        setIsDocumentViewOpen(false);
+        if (currentDocumentUrl) {
+          releaseDocumentUrl(currentDocumentUrl);
+          setCurrentDocumentUrl(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Visualización de Documento</DialogTitle>
           </DialogHeader>
           <div className="aspect-w-16 aspect-h-9">
             {currentDocumentUrl && (
-              <iframe src={currentDocumentUrl} title="Document Preview" className="border-none" />
+              <iframe src={currentDocumentUrl} title="Document Preview" className="border-none w-full h-[400px]" />
             )}
           </div>
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setIsDocumentViewOpen(false)}>
+            <Button variant="secondary" onClick={() => {
+              setIsDocumentViewOpen(false);
+              if (currentDocumentUrl) {
+                releaseDocumentUrl(currentDocumentUrl);
+                setCurrentDocumentUrl(null);
+              }
+            }}>
               Cerrar
             </Button>
           </DialogFooter>
@@ -1017,11 +1060,15 @@ const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes
               <SelectValue placeholder="Seleccionar tipo" />
             </SelectTrigger>
             <SelectContent>
-              {documentTypes?.map((type) => (
-                <SelectItem key={type.id} value={type.name}>
-                  {type.name}
-                </SelectItem>
-              ))}
+              {Object.entries(DocumentType).length > 0 ? (
+                Object.keys(DocumentType).map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="other">Otro</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
