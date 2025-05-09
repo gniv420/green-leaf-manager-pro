@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -56,7 +55,8 @@ import {
 import { formatDecimal } from '@/lib/utils';
 import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
 import { ImageIcon } from 'lucide-react';
-import { DocumentType } from '@/lib/document-types';
+import type { DocumentType } from '@/lib/document-types';
+import { documentTypeLabels } from '@/lib/document-types';
 import { openDocument, releaseDocumentUrl } from '@/lib/document-viewer';
 
 const formSchema = z.object({
@@ -1060,15 +1060,11 @@ const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes
               <SelectValue placeholder="Seleccionar tipo" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(DocumentType).length > 0 ? (
-                Object.keys(DocumentType).map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="other">Otro</SelectItem>
-              )}
+              {Object.keys(documentTypeLabels).map((type) => (
+                <SelectItem key={type} value={type}>
+                  {documentTypeLabels[type as DocumentType]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
