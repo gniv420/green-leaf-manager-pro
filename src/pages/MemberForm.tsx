@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { db, Member, MemberTransaction } from '@/lib/db';
@@ -40,11 +41,11 @@ const MemberForm = () => {
     memberCode: '',
     dob: new Date(),
     dni: '',
-    email: '',
-    phone: '666666666', // Added default phone number
-    address: '',
-    city: '',
-    postalCode: '',
+    email: '', // Keeping in the state but removed from the form
+    phone: '666666666',
+    address: '', // Keeping in the state but removed from the form
+    city: '', // Keeping in the state but removed from the form
+    postalCode: '', // Keeping in the state but removed from the form
     joinDate: new Date(),
     consumptionGrams: 0,
     status: 'active',
