@@ -44,6 +44,15 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
     [memberId]
   );
 
+  // Obtener el saldo actual del socio
+  const member = useLiveQuery(
+    async () => {
+      if (!memberId) return null;
+      return db.members.get(memberId);
+    },
+    [memberId]
+  );
+
   if (!dispensaryRecords || dispensaryRecords.length === 0) {
     return (
       <div className="text-center p-8 text-muted-foreground">
@@ -56,10 +65,11 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
   // Calcular totales
   const totalDispensed = dispensaryRecords.reduce((sum, record) => sum + record.quantity, 0);
   const totalSpent = dispensaryRecords.reduce((sum, record) => sum + record.price, 0);
+  const currentBalance = member?.balance || 0;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="p-4 border rounded-lg">
           <p className="text-sm text-muted-foreground">Total dispensado</p>
           <p className="text-xl font-bold">{formatDecimal(totalDispensed)} g</p>
@@ -67,6 +77,12 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
         <div className="p-4 border rounded-lg">
           <p className="text-sm text-muted-foreground">Total gastado</p>
           <p className="text-xl font-bold">{formatDecimal(totalSpent)} €</p>
+        </div>
+        <div className={`p-4 border rounded-lg ${currentBalance < 0 ? 'bg-red-50 border-red-200' : currentBalance > 0 ? 'bg-green-50 border-green-200' : ''}`}>
+          <p className="text-sm text-muted-foreground">Saldo monedero</p>
+          <p className={`text-xl font-bold ${currentBalance < 0 ? 'text-red-600' : currentBalance > 0 ? 'text-green-600' : ''}`}>
+            {formatDecimal(currentBalance)} €
+          </p>
         </div>
       </div>
 

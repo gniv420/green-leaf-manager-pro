@@ -1,666 +1,978 @@
-
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { db, Member as MemberType, Document as DocumentType } from '@/lib/db';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, Member, Document as DocumentType } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Upload, Eye, Trash2, Plus, Minus, Edit, X, Key } from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import DocumentsSection from '@/components/DocumentsSection';
-import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Pencil,
+  Trash,
+  File,
+  Eye,
+  Plus,
+  AlertCircle,
+} from 'lucide-react';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
   DialogDescription,
-} from '@/components/ui/dialog';
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { formatDecimal } from '@/lib/utils';
+import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
+import { Document } from '.';
+import { ImageIcon } from '@radix-ui/react-icons';
+import { uploadFile } from '@/lib/firebase';
 
-const MemberDetails = () => {
-  const { id } = useParams<{ id: string }>();
-  const memberId = parseInt(id || '0');
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  
-  const [member, setMember] = useState<MemberType | null>(null);
-  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
-  const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
-  const [transactionAmount, setTransactionAmount] = useState<number>(0);
-  const [transactionNotes, setTransactionNotes] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isRfidDialogOpen, setIsRfidDialogOpen] = useState(false);
-  const [rfidCode, setRfidCode] = useState<string>('');
-  const [isListeningForRfid, setIsListeningForRfid] = useState(false);
-  
-  // Estado para el formulario de edición
-  const [editFormData, setEditFormData] = useState({
-    firstName: '',
-    lastName: '',
-    dni: '',
-    dob: '',
-    phone: '',
-    consumptionGrams: 0,
-    rfidCode: '',
-  });
-  
-  useEffect(() => {
-    const fetchMember = async () => {
-      if (!memberId) return;
-      
-      try {
-        const memberData = await db.members.get(memberId);
-        if (memberData) {
-          setMember(memberData);
-          // Inicializar el formulario con los datos del socio
-          setEditFormData({
-            firstName: memberData.firstName,
-            lastName: memberData.lastName,
-            dni: memberData.dni,
-            dob: format(new Date(memberData.dob), 'yyyy-MM-dd'),
-            phone: memberData.phone || '',
-            consumptionGrams: memberData.consumptionGrams || 0,
-            rfidCode: memberData.rfidCode || '',
-          });
-        } else {
-          toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'No se encontró el socio'
-          });
-          navigate('/members');
-        }
-      } catch (error) {
-        console.error('Error fetching member:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'No se pudo cargar la información del socio'
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchMember();
-  }, [memberId, navigate, toast]);
-  
-  const handleOpenTransactionDialog = (type: 'deposit' | 'withdrawal') => {
-    setTransactionType(type);
-    setTransactionAmount(0);
-    setTransactionNotes('');
-    setIsTransactionDialogOpen(true);
+const formSchema = z.object({
+  firstName: z.string().min(2, {
+    message: "El nombre debe tener al menos 2 caracteres.",
+  }),
+  lastName: z.string().min(2, {
+    message: "El apellido debe tener al menos 2 caracteres.",
+  }),
+  dni: z.string().min(9, {
+    message: "El DNI debe tener al menos 9 caracteres.",
+  }),
+  email: z.string().email({
+    message: "Introduce un email válido.",
+  }),
+  phone: z.string().min(9, {
+    message: "El teléfono debe tener al menos 9 caracteres.",
+  }),
+  dob: z.date(),
+  address: z.string().min(2, {
+    message: "La dirección debe tener al menos 2 caracteres.",
+  }),
+  city: z.string().min(2, {
+    message: "La ciudad debe tener al menos 2 caracteres.",
+  }),
+  postalCode: z.string().min(5, {
+    message: "El código postal debe tener al menos 5 caracteres.",
+  }),
+  joinDate: z.date(),
+  consumptionGrams: z.number(),
+  notes: z.string().optional(),
+  status: z.enum(['active', 'inactive', 'pending']),
+  rfidCode: z.string().optional(),
+})
+
+// Define a component here for the form functionality
+const BalanceAdjustmentDialog: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (amount: number, notes: string, paymentMethod: 'cash' | 'bizum') => void;
+}> = ({ isOpen, onClose, onConfirm }) => {
+  const [amount, setAmount] = useState<string>('0');
+  const [notes, setNotes] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bizum'>('cash');
+
+  const handleConfirm = () => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      alert('Por favor, introduce una cantidad válida');
+      return;
+    }
+    onConfirm(numAmount, notes, paymentMethod);
+    // Reset form
+    setAmount('0');
+    setNotes('');
+    setPaymentMethod('cash');
+    onClose();
   };
 
-  // Listener para RFID
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Añadir saldo al monedero</DialogTitle>
+          <DialogDescription>
+            Introduce la cantidad que deseas añadir al monedero del socio.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="amount" className="text-right">
+              Cantidad (€)
+            </Label>
+            <Input
+              id="amount"
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="paymentMethod" className="text-right">
+              Método de pago
+            </Label>
+            <Select value={paymentMethod} onValueChange={(value: 'cash' | 'bizum') => setPaymentMethod(value)}>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Método de pago" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Efectivo</SelectItem>
+                <SelectItem value="bizum">Bizum</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="notes" className="text-right">
+              Notas
+            </Label>
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleConfirm}>
+            Confirmar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const MemberDetails = () => {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
+  const [currentDocumentUrl, setCurrentDocumentUrl] = useState<string | null>(null);
+  const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
+  // Añadir estado para el diálogo de ajuste de saldo
+  const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false);
+
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { memberId } = useParams<{ memberId: string }>();
+
+  const member = useLiveQuery(async () => {
+    if (!memberId) return undefined;
+    return await db.members.get(parseInt(memberId));
+  });
+
+  const dispensaryHistory = useLiveQuery(async () => {
+    if (!memberId) return [];
+    return await db.dispensary
+      .where('memberId')
+      .equals(parseInt(memberId))
+      .reverse()
+      .sortBy('createdAt');
+  });
+
+  const documentTypes = useLiveQuery(() => db.documents.toArray());
+
+  const documents = useLiveQuery(async () => {
+    if (!memberId) return [];
+    return await db.documents
+      .where('memberId')
+      .equals(parseInt(memberId))
+      .toArray();
+  });
+
+  // Obtenemos el registro de caja abierta para validar
+  const currentCashRegister = useLiveQuery(() => {
+    return db.cashRegisters
+      .where('status')
+      .equals('open')
+      .first();
+  });
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      dni: '',
+      email: '',
+      phone: '',
+      dob: new Date(),
+      address: '',
+      city: '',
+      postalCode: '',
+      joinDate: new Date(),
+      consumptionGrams: 0,
+      notes: '',
+      status: 'active',
+      rfidCode: '',
+    },
+    mode: "onChange",
+  })
+
   useEffect(() => {
-    let buffer = '';
-    let lastInputTime = Date.now();
-    const TIMEOUT_MS = 500; // 500ms entre caracteres se considera un nuevo escaneo
-    
-    const keydownListener = (event: KeyboardEvent) => {
-      if (!isListeningForRfid) return;
-      
-      const currentTime = Date.now();
-      
-      // Si ha pasado mucho tiempo desde la última entrada, reiniciar el buffer
-      if (currentTime - lastInputTime > TIMEOUT_MS) {
-        buffer = '';
-      }
-      
-      lastInputTime = currentTime;
-      
-      // Solo procesar caracteres relevantes
-      if (/[\d\w]/.test(event.key) && event.key.length === 1) {
-        buffer += event.key;
-      }
-      
-      // Enter significa fin del escaneo
-      if (event.key === 'Enter' && buffer.length > 0) {
-        setRfidCode(buffer);
-        setIsListeningForRfid(false);
-        event.preventDefault(); // Prevenir comportamiento default del Enter
-      }
-    };
-    
-    if (isListeningForRfid) {
-      window.addEventListener('keydown', keydownListener);
-    }
-    
-    return () => {
-      window.removeEventListener('keydown', keydownListener);
-    };
-  }, [isListeningForRfid]);
-  
-  // Cuando el código RFID cambia, actualizarlo en el formulario
-  useEffect(() => {
-    if (rfidCode && isRfidDialogOpen) {
-      setEditFormData(prev => ({
-        ...prev,
-        rfidCode
-      }));
-    }
-  }, [rfidCode, isRfidDialogOpen]);
-  
-  const handleTransaction = async () => {
-    if (!member || !member.id || transactionAmount <= 0) return;
-    
-    try {
-      // En una aplicación real, obtendríamos el userId del contexto de autenticación
-      const userId = 1; // Usando el admin por defecto
-      
-      // Obtener registro de caja abierta
-      const currentCashRegister = await db.cashRegisters
-        .where('status')
-        .equals('open')
-        .first();
-        
-      if (!currentCashRegister) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Debe abrir una caja para realizar operaciones con saldo'
-        });
-        return;
-      }
-      
-      // Calcular nuevo saldo
-      const newBalance = transactionType === 'deposit' 
-        ? (member.balance || 0) + transactionAmount
-        : (member.balance || 0) - transactionAmount;
-        
-      // Validar que hay suficiente saldo para retiradas
-      if (transactionType === 'withdrawal' && newBalance < 0) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Saldo insuficiente para realizar esta operación'
-        });
-        return;
-      }
-      
-      // Registrar transacción del socio
-      await db.memberTransactions.add({
-        memberId: member.id,
-        amount: transactionAmount,
-        type: transactionType,
-        notes: transactionNotes,
-        userId,
-        createdAt: new Date()
+    if (member) {
+      form.reset({
+        firstName: member.firstName,
+        lastName: member.lastName,
+        dni: member.dni,
+        email: member.email,
+        phone: member.phone,
+        dob: member.dob,
+        address: member.address,
+        city: member.city,
+        postalCode: member.postalCode,
+        joinDate: member.joinDate,
+        consumptionGrams: member.consumptionGrams,
+        notes: member.notes || '',
+        status: member.status,
+        rfidCode: member.rfidCode || '',
       });
-      
-      // Actualizar saldo del socio
-      await db.members.update(member.id, {
+    }
+  }, [member, form]);
+
+  const handleConfirmDeleteDocument = (documentId?: number) => {
+    if (!documentId) return;
+    setDocumentToDelete(documentId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    if (!memberId) return;
+
+    try {
+      await db.members.update(parseInt(memberId), {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        dni: data.dni,
+        email: data.email,
+        phone: data.phone,
+        dob: data.dob,
+        address: data.address,
+        city: data.city,
+        postalCode: data.postalCode,
+        joinDate: data.joinDate,
+        consumptionGrams: data.consumptionGrams,
+        notes: data.notes,
+        status: data.status,
+        rfidCode: data.rfidCode,
+        updatedAt: new Date(),
+      });
+
+      toast({
+        title: "Socio actualizado.",
+        description: "Los datos del socio han sido actualizados correctamente.",
+      })
+      setIsEditMode(false);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error.",
+        description: "No se pudieron actualizar los datos del socio.",
+      })
+    }
+  }
+
+  const handleDelete = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!memberId) return;
+
+    try {
+      await db.members.delete(parseInt(memberId));
+      toast({
+        title: "Socio eliminado.",
+        description: "El socio ha sido eliminado correctamente.",
+      })
+      navigate('/members');
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error.",
+        description: "No se pudo eliminar el socio.",
+      })
+    } finally {
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File | null, documentType: string) => {
+    if (!memberId || !file) return;
+
+    try {
+      // Subir el archivo a Firebase Storage
+      const url = await uploadFile(file);
+
+      // Guardar la referencia en la base de datos
+      await db.documents.add({
+        memberId: parseInt(memberId),
+        type: documentType,
+        uploadDate: new Date(),
+        url: url,
+        name: file.name,
+      });
+
+      toast({
+        title: "Documento subido.",
+        description: "El documento ha sido subido correctamente.",
+      })
+    } catch (error) {
+      console.error("Error al subir el documento:", error);
+      toast({
+        variant: "destructive",
+        title: "Error.",
+        description: "No se pudo subir el documento.",
+      })
+    } finally {
+      setIsUploadDialogOpen(false);
+    }
+  };
+
+  // Función para manejar el ajuste de saldo del monedero
+  const handleBalanceAdjustment = async (amount: number, notes: string, paymentMethod: 'cash' | 'bizum') => {
+    if (!memberId || !currentCashRegister) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se puede ajustar el saldo. Verifica que haya una caja abierta."
+      });
+      return;
+    }
+
+    try {
+      // Obtener el socio actual
+      const memberToUpdate = await db.members.get(parseInt(memberId));
+      if (!memberToUpdate) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se encontró el socio"
+        });
+        return;
+      }
+
+      // Calcular el nuevo saldo
+      const currentBalance = memberToUpdate.balance || 0;
+      const newBalance = currentBalance + amount;
+
+      // Actualizar el saldo del socio
+      await db.members.update(parseInt(memberId), {
         balance: newBalance,
         updatedAt: new Date()
       });
-      
-      // Registrar en caja
-      await db.cashTransactions.add({
-        type: transactionType === 'deposit' ? 'income' : 'expense',
-        amount: transactionAmount,
-        concept: `${transactionType === 'deposit' ? 'Depósito' : 'Retirada'} de saldo`,
-        notes: `Socio: ${member.firstName} ${member.lastName} - ${transactionNotes}`,
-        userId,
-        cashRegisterId: currentCashRegister.id,
-        paymentMethod: 'cash', // Añadimos el método de pago por defecto
+
+      // Registrar la transacción del socio
+      await db.memberTransactions.add({
+        memberId: parseInt(memberId),
+        amount: amount, // Positivo porque es una entrada
+        type: 'deposit',
+        notes: notes || 'Ajuste de saldo',
+        userId: 1, // Admin por defecto
         createdAt: new Date()
       });
-      
-      // Actualizar estado local
-      setMember({
-        ...member,
-        balance: newBalance
+
+      // Registrar el ingreso en la caja
+      await db.cashTransactions.add({
+        type: 'income',
+        amount: amount,
+        concept: `Recarga de monedero`,
+        notes: `Socio ID: ${memberId} - ${notes || 'Ajuste de saldo'}`,
+        userId: 1, // Admin por defecto
+        paymentMethod: paymentMethod,
+        cashRegisterId: currentCashRegister.id,
+        createdAt: new Date()
       });
-      
+
       toast({
-        title: 'Operación exitosa',
-        description: `Se ha ${transactionType === 'deposit' ? 'añadido' : 'retirado'} saldo correctamente`
+        title: "Saldo actualizado",
+        description: `Se han añadido ${amount}€ al monedero del socio`
       });
-      
-      setIsTransactionDialogOpen(false);
-      
     } catch (error) {
-      console.error('Error in transaction:', error);
+      console.error("Error al ajustar saldo:", error);
       toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudo completar la operación'
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo actualizar el saldo del monedero"
       });
     }
   };
 
-  const handleEditFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setEditFormData(prev => ({
-      ...prev,
-      [name]: name === 'consumptionGrams' ? Number(value) : value
-    }));
-  };
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete) return;
 
-  const handleOpenRfidDialog = () => {
-    setRfidCode('');
-    setIsRfidDialogOpen(true);
-  };
-
-  const startRfidListener = () => {
-    setRfidCode('');
-    setIsListeningForRfid(true);
-  };
-
-  const handleSaveRfid = () => {
-    if (rfidCode) {
-      setEditFormData(prev => ({
-        ...prev,
-        rfidCode
-      }));
-      setIsRfidDialogOpen(false);
-      
-      // Si no estamos en modo edición, guardar directamente
-      if (!isEditing && member?.id) {
-        db.members.update(member.id, {
-          rfidCode,
-          updatedAt: new Date()
-        }).then(() => {
-          setMember(prev => prev ? {...prev, rfidCode} : null);
-          toast({
-            title: 'Llavero RFID asignado',
-            description: 'El código RFID ha sido asignado correctamente'
-          });
-        }).catch(error => {
-          console.error('Error saving RFID code:', error);
-          toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'No se pudo guardar el código RFID'
-          });
-        });
-      }
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    if (!member || !member.id) return;
-    
     try {
-      const updatedMember = {
-        ...member,
-        firstName: editFormData.firstName,
-        lastName: editFormData.lastName,
-        dni: editFormData.dni,
-        dob: new Date(editFormData.dob),
-        phone: editFormData.phone,
-        consumptionGrams: Number(editFormData.consumptionGrams),
-        rfidCode: editFormData.rfidCode,
-        updatedAt: new Date()
-      };
-      
-      await db.members.update(member.id, updatedMember);
-      
-      // Actualizar el estado local
-      setMember(updatedMember);
-      setIsEditing(false);
-      
+      await db.documents.delete(documentToDelete);
       toast({
-        title: 'Cambios guardados',
-        description: 'Los datos del socio han sido actualizados'
-      });
+        title: "Documento eliminado.",
+        description: "El documento ha sido eliminado correctamente.",
+      })
     } catch (error) {
-      console.error('Error updating member:', error);
       toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudieron guardar los cambios'
-      });
+        variant: "destructive",
+        title: "Error.",
+        description: "No se pudo eliminar el documento.",
+      })
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setDocumentToDelete(null);
     }
   };
 
-  if (isLoading) {
+  if (!member) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+      <div className="container mx-auto py-10">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold tracking-tight">Detalles del Socio</h1>
+        </div>
+        <div className="flex items-center justify-center h-40">
+          <p className="text-muted-foreground">Cargando información del socio...</p>
+        </div>
       </div>
     );
   }
 
-  if (!member) {
-    return null;
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => navigate('/members')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
+    <div className="container mx-auto py-10">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Detalles del Socio</h1>
+        <Button variant="secondary" onClick={() => navigate('/members')}>
           Volver
         </Button>
-        {!isEditing ? (
-          <Button variant="outline" onClick={() => setIsEditing(true)}>
-            <Edit className="mr-2 h-4 w-4" />
-            Editar Datos
-          </Button>
-        ) : (
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={() => setIsEditing(false)}>
-              <X className="mr-2 h-4 w-4" />
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveEdit}>
-              <Save className="mr-2 h-4 w-4" />
-              Guardar
-            </Button>
-          </div>
-        )}
       </div>
-      
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {member.firstName} {member.lastName}
-          </h1>
-          <p className="text-muted-foreground">
-            <span className="font-mono">{member.memberCode}</span> · DNI: {member.dni}
-          </p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => handleOpenTransactionDialog('deposit')}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Añadir Saldo
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleOpenTransactionDialog('withdrawal')}
-            disabled={(member.balance || 0) <= 0}
-          >
-            <Minus className="mr-2 h-4 w-4" />
-            Retirar Saldo
-          </Button>
-        </div>
-      </div>
-      
-      {/* Formulario de edición o tarjeta de información */}
-      {isEditing ? (
+
+      {isEditMode && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Editar Información</CardTitle>
+          <CardHeader>
+            <CardTitle>Editar Socio</CardTitle>
+            <CardDescription>
+              Modifica los datos del socio.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="firstName" className="text-sm font-medium">
-                  Nombre
-                </label>
-                <Input 
-                  id="firstName"
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
                   name="firstName"
-                  value={editFormData.firstName}
-                  onChange={handleEditFormChange}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Nombre" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Nombre del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="lastName" className="text-sm font-medium">
-                  Apellidos
-                </label>
-                <Input 
-                  id="lastName"
+                <FormField
+                  control={form.control}
                   name="lastName"
-                  value={editFormData.lastName}
-                  onChange={handleEditFormChange}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Apellido</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Apellido" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Apellido del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="dni" className="text-sm font-medium">
-                  DNI
-                </label>
-                <Input 
-                  id="dni"
+                <FormField
+                  control={form.control}
                   name="dni"
-                  value={editFormData.dni}
-                  onChange={handleEditFormChange}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>DNI</FormLabel>
+                      <FormControl>
+                        <Input placeholder="DNI" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        DNI del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="dob" className="text-sm font-medium">
-                  Fecha de nacimiento
-                </label>
-                <Input 
-                  id="dob"
-                  name="dob"
-                  type="date"
-                  value={editFormData.dob}
-                  onChange={handleEditFormChange}
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Email" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Email del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="phone" className="text-sm font-medium">
-                  Teléfono
-                </label>
-                <Input 
-                  id="phone"
+                <FormField
+                  control={form.control}
                   name="phone"
-                  value={editFormData.phone}
-                  onChange={handleEditFormChange}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Teléfono</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Teléfono" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Teléfono del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="consumptionGrams" className="text-sm font-medium">
-                  Consumo mensual (gramos)
-                </label>
-                <Input 
-                  id="consumptionGrams"
+                <FormField
+                  control={form.control}
+                  name="dob"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fecha de nacimiento</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={format(new Date(field.value), 'yyyy-MM-dd')}
+                          onChange={(e) => field.onChange(new Date(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Fecha de nacimiento del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dirección</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Dirección" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Dirección del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ciudad</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ciudad" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Ciudad del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="postalCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Código Postal</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Código Postal" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Código Postal del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="joinDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fecha de alta</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={format(new Date(field.value), 'yyyy-MM-dd')}
+                          onChange={(e) => field.onChange(new Date(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Fecha de alta del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="consumptionGrams"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={editFormData.consumptionGrams}
-                  onChange={handleEditFormChange}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Consumo estimado (gramos/mes)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Consumo estimado"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Consumo estimado del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="rfidCode" className="text-sm font-medium">
-                  Código RFID
-                </label>
-                <div className="flex gap-2">
-                  <Input 
-                    id="rfidCode"
-                    name="rfidCode"
-                    value={editFormData.rfidCode}
-                    onChange={handleEditFormChange}
-                    readOnly
-                    placeholder="Sin llavero asignado"
-                  />
-                  <Button type="button" onClick={handleOpenRfidDialog}>
-                    <Key className="h-4 w-4" />
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notas</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Notas"
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Notas adicionales sobre el socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un estado" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="active">Activo</SelectItem>
+                          <SelectItem value="inactive">Inactivo</SelectItem>
+                          <SelectItem value="pending">Pendiente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Estado del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="rfidCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Código RFID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Código RFID" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Código RFID del socio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end">
+                  <Button type="submit">
+                    Actualizar
                   </Button>
                 </div>
-              </div>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <p>Código de socio: {member.memberCode}</p>
-              <p>Fecha de registro: {format(new Date(member.createdAt), 'dd/MM/yyyy', { locale: es })}</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Información General</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Fecha de nacimiento</p>
-              <p className="font-medium">{format(new Date(member.dob), 'dd/MM/yyyy', { locale: es })}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Consumo mensual</p>
-              <p className="font-medium">{member.consumptionGrams} gramos</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Fecha de registro</p>
-              <p className="font-medium">{format(new Date(member.createdAt), 'dd/MM/yyyy', { locale: es })}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Saldo disponible</p>
-              <p className="text-2xl font-bold text-green-600">{(member.balance || 0).toFixed(2)} €</p>
-            </div>
-            <div>
-              <div className="flex justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Llavero RFID</p>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 p-1" 
-                  onClick={handleOpenRfidDialog}
-                >
-                  <Key className="h-4 w-4 mr-1" />
-                  {member.rfidCode ? 'Cambiar' : 'Asignar'}
-                </Button>
-              </div>
-              <p className="font-medium font-mono">
-                {member.rfidCode || 'No asignado'}
-              </p>
-            </div>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       )}
-      
-      {/* Pestañas para documentos e historial */}
-      <Tabs defaultValue="documents">
-        <TabsList>
-          <TabsTrigger value="documents">Documentos</TabsTrigger>
-          <TabsTrigger value="dispensary">Historial de Dispensaciones</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="documents" className="pt-4">
-          <DocumentsSection memberId={memberId} />
-        </TabsContent>
-        
-        <TabsContent value="dispensary" className="pt-4">
-          <MemberDispensaryHistory memberId={memberId} />
-        </TabsContent>
-      </Tabs>
-      
-      {/* Diálogo para transactions */}
-      <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+
+      {!isEditMode && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-2xl">{member.firstName} {member.lastName}</CardTitle>
+                  <CardDescription>
+                    Código de socio: {member.memberCode} • DNI: {member.dni}
+                  </CardDescription>
+                </div>
+                <div className="space-x-2">
+                  <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Editar
+                  </Button>
+                  <Button variant="destructive" onClick={handleDelete}>
+                    <Trash className="mr-2 h-4 w-4" />
+                    Eliminar
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Email</h3>
+                  <p>{member.email || "No especificado"}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Teléfono</h3>
+                  <p>{member.phone || "No especificado"}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Fecha de nacimiento</h3>
+                  <p>{member.dob ? format(new Date(member.dob), 'dd/MM/yyyy') : "No especificada"}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Fecha de alta</h3>
+                  <p>{member.joinDate ? format(new Date(member.joinDate), 'dd/MM/yyyy') : "No especificada"}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Consumo estimado</h3>
+                  <p>{member.consumptionGrams ? `${member.consumptionGrams}g / mes` : "No especificado"}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Estado</h3>
+                  <Badge variant={
+                    member.status === 'active' ? 'default' : 
+                    member.status === 'inactive' ? 'destructive' : 
+                    'outline'
+                  }>
+                    {member.status === 'active' ? 'Activo' : 
+                     member.status === 'inactive' ? 'Inactivo' : 
+                     'Pendiente'}
+                  </Badge>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Dirección</h3>
+                  <p>{member.address || "No especificada"}</p>
+                  <p>{member.postalCode} {member.city}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Código RFID</h3>
+                  <p>{member.rfidCode || "No especificado"}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">Notas</h3>
+                  <p className="whitespace-pre-line">{member.notes || "Sin notas adicionales"}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">Saldo del monedero</h3>
+                      <p className={`text-lg font-semibold ${
+                        (member.balance || 0) < 0 
+                          ? 'text-destructive' 
+                          : (member.balance || 0) > 0 
+                            ? 'text-green-600' 
+                            : ''
+                      }`}>
+                        {formatDecimal(member.balance || 0)} €
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => setIsBalanceDialogOpen(true)}
+                      disabled={!currentCashRegister}
+                      variant="outline"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Añadir saldo
+                    </Button>
+                  </div>
+                  {!currentCashRegister && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      <AlertCircle className="h-3 w-3 inline mr-1" />
+                      Debes abrir una caja para ajustar el saldo
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-center">
+                <CardTitle>Documentos</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setIsUploadDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Subir documento
+                </Button>
+              </div>
+              <CardDescription>
+                Documentos asociados al socio
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {documents && documents.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {documents.map((doc) => (
+                    <Card key={doc.id} className="shadow-sm">
+                      <CardHeader>
+                        <CardTitle className="flex items-center">
+                          <File className="mr-2 h-4 w-4" />
+                          {doc.name}
+                        </CardTitle>
+                        <CardDescription>
+                          {doc.type} • {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex justify-between">
+                          <Button variant="secondary" size="sm" onClick={() => {
+                            setCurrentDocumentUrl(doc.url || null);
+                            setIsDocumentViewOpen(true);
+                          }}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleConfirmDeleteDocument(doc.id)}>
+                            <Trash className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-32">
+                  <ImageIcon className="h-6 w-6 mr-2 text-muted-foreground" />
+                  <p className="text-muted-foreground">No hay documentos asociados a este socio.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Historial de Dispensaciones</CardTitle>
+              <CardDescription>
+                Registro histórico de dispensaciones del socio
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MemberDispensaryHistory memberId={parseInt(memberId)} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Balance adjustment dialog */}
+      <BalanceAdjustmentDialog 
+        isOpen={isBalanceDialogOpen}
+        onClose={() => setIsBalanceDialogOpen(false)}
+        onConfirm={handleBalanceAdjustment}
+      />
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {transactionType === 'deposit' ? 'Añadir Saldo' : 'Retirar Saldo'}
-            </DialogTitle>
+            <DialogTitle>¿Estás seguro?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. ¿Estás seguro de que quieres eliminar este socio?
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Saldo actual: <span className="font-medium">{(member.balance || 0).toFixed(2)} €</span>
-              </p>
-              
-              <label htmlFor="amount" className="block text-sm font-medium mb-1">
-                Importe (€)
-              </label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                max={transactionType === 'withdrawal' ? member.balance || 0 : undefined}
-                value={transactionAmount}
-                onChange={(e) => setTransactionAmount(parseFloat(e.target.value) || 0)}
-              />
-              
-              {transactionType === 'deposit' && (
-                <p className="text-xs text-green-600 mt-1">
-                  Nuevo saldo: {((member.balance || 0) + transactionAmount).toFixed(2)} €
-                </p>
-              )}
-              
-              {transactionType === 'withdrawal' && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Nuevo saldo: {((member.balance || 0) - transactionAmount).toFixed(2)} €
-                </p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="notes" className="block text-sm font-medium mb-1">
-                Notas (opcional)
-              </label>
-              <Input
-                id="notes"
-                value={transactionNotes}
-                onChange={(e) => setTransactionNotes(e.target.value)}
-                placeholder="Añadir notas a esta transacción..."
-              />
-            </div>
-          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTransactionDialogOpen(false)}>
+            <Button variant="secondary" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handleTransaction}
-              disabled={transactionAmount <= 0}
-              variant={transactionType === 'deposit' ? 'default' : 'secondary'}
-            >
-              {transactionType === 'deposit' ? 'Añadir Saldo' : 'Retirar Saldo'}
+            <Button variant="destructive" onClick={handleConfirmDelete}>
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* Diálogo para RFID */}
-      <Dialog open={isRfidDialogOpen} onOpenChange={setIsRfidDialogOpen}>
+
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Lector de llavero RFID</DialogTitle>
+            <DialogTitle>Subir Documento</DialogTitle>
             <DialogDescription>
-              Pase el llavero RFID por el lector para registrar su código.
+              Selecciona el tipo de documento y el archivo que deseas subir.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <label htmlFor="rfidCodeInput" className="block text-sm font-medium mb-1">
-                Código RFID
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id="rfidCodeInput"
-                  value={rfidCode}
-                  onChange={(e) => setRfidCode(e.target.value)}
-                  placeholder="Escanee el llavero o ingrese el código manualmente"
-                />
-                <Button 
-                  onClick={startRfidListener} 
-                  disabled={isListeningForRfid}
-                  variant="secondary"
-                >
-                  <Key className="h-4 w-4 mr-2" />
-                  {isListeningForRfid ? 'Escuchando...' : 'Escanear'}
-                </Button>
-              </div>
-              {isListeningForRfid && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Esperando lectura del llavero RFID...
-                </p>
-              )}
-            </div>
+          <UploadForm handleFileUpload={handleFileUpload} documentTypes={documentTypes} onClose={() => setIsUploadDialogOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDocumentViewOpen} onOpenChange={() => setIsDocumentViewOpen(false)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Visualización de Documento</DialogTitle>
+          </DialogHeader>
+          <div className="aspect-w-16 aspect-h-9">
+            {currentDocumentUrl && (
+              <iframe src={currentDocumentUrl} title="Document Preview" className="border-none" />
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRfidDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSaveRfid}
-              disabled={!rfidCode}
-            >
-              Guardar
+            <Button variant="secondary" onClick={() => setIsDocumentViewOpen(false)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -669,4 +981,31 @@ const MemberDetails = () => {
   );
 };
 
-export default MemberDetails;
+interface UploadFormProps {
+  handleFileUpload: (file: File | null, documentType: string) => Promise<void>;
+  documentTypes: DocumentType[] | undefined;
+  onClose: () => void;
+}
+
+const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes, onClose }) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedFile || !selectedDocumentType) {
+      alert('Por favor, selecciona un archivo y un tipo de documento.');
+      return;
+    }
+    await handleFileUpload(selectedFile, selectedDocumentType);
+    onClose();
+  };
+
+  return (
+    <Form onSubmit={handleSubmit}>
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="documentType" className="text-right">
+            Tipo de Documento
+          </Label>
+          <Select onValueChange={setSelected

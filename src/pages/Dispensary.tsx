@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -350,7 +349,7 @@ const Dispensary = () => {
       });
       
     } catch (error) {
-      console.error('Error al eliminar dispensación:', error);
+      console.error('Error al eliminar dispensaci��n:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -435,17 +434,43 @@ const Dispensary = () => {
         updatedAt: new Date()
       });
       
-      // Registrar el pago en caja
-      await db.cashTransactions.add({
-        type: 'income',
-        amount: price,
-        concept: `Dispensación de ${product.name}`,
-        notes: `Para socio ID: ${memberId}`,
-        userId: 1, // Admin por defecto
-        paymentMethod,
-        cashRegisterId: currentCashRegister.id,
-        createdAt: new Date()
-      });
+      // Si el método de pago es monedero, actualizar el saldo del socio
+      if (paymentMethod === 'wallet') {
+        // Obtener socio actual
+        const member = await db.members.get(memberId);
+        if (member) {
+          // Actualizar saldo (puede quedar negativo)
+          const currentBalance = member.balance || 0;
+          const newBalance = currentBalance - price;
+          
+          await db.members.update(memberId, {
+            balance: newBalance,
+            updatedAt: new Date()
+          });
+          
+          // Registrar la transacción del socio
+          await db.memberTransactions.add({
+            memberId,
+            amount: -price,  // Negativo porque es una salida
+            type: 'withdrawal',
+            notes: `Dispensación de ${product.name}`,
+            userId: 1, // Admin por defecto
+            createdAt: new Date()
+          });
+        }
+      } else {
+        // Registrar el pago en caja solo si es efectivo o bizum
+        await db.cashTransactions.add({
+          type: 'income',
+          amount: price,
+          concept: `Dispensación de ${product.name}`,
+          notes: `Para socio ID: ${memberId}`,
+          userId: 1, // Admin por defecto
+          paymentMethod,
+          cashRegisterId: currentCashRegister.id,
+          createdAt: new Date()
+        });
+      }
       
       // Limpiar formulario
       form.reset({
@@ -892,4 +917,3 @@ const Dispensary = () => {
 };
 
 export default Dispensary;
-
