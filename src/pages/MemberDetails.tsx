@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Member, Document as DocumentType } from '@/lib/db';
+import { db, Member } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,9 +54,8 @@ import {
 } from "@/components/ui/dialog"
 import { formatDecimal } from '@/lib/utils';
 import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
-import { Document } from '.';
-import { ImageIcon } from '@radix-ui/react-icons';
-import { uploadFile } from '@/lib/firebase';
+import { ImageIcon } from 'lucide-react';
+import { DocumentType } from '@/lib/document-types';
 
 const formSchema = z.object({
   firstName: z.string().min(2, {
@@ -333,20 +332,25 @@ const MemberDetails = () => {
     }
   };
 
-  const handleFileUpload = async (file: File | null, documentType: string) => {
+  // Modify the handleFileUpload function to use a mock function instead of the firebase upload
+  const handleFileUpload = async (file: File | null, docType: string) => {
     if (!memberId || !file) return;
 
     try {
-      // Subir el archivo a Firebase Storage
-      const url = await uploadFile(file);
+      // Mock URL instead of actual Firebase upload
+      const url = URL.createObjectURL(file);
 
       // Guardar la referencia en la base de datos
       await db.documents.add({
         memberId: parseInt(memberId),
-        type: documentType,
+        type: docType as DocumentType,
         uploadDate: new Date(),
-        url: url,
         name: file.name,
+        fileName: file.name,
+        contentType: file.type,
+        size: file.size,
+        data: await file.arrayBuffer(),
+        createdAt: new Date(),
       });
 
       toast({
@@ -983,7 +987,7 @@ const MemberDetails = () => {
 
 interface UploadFormProps {
   handleFileUpload: (file: File | null, documentType: string) => Promise<void>;
-  documentTypes: DocumentType[] | undefined;
+  documentTypes: any[] | undefined;
   onClose: () => void;
 }
 

@@ -19,6 +19,7 @@ export interface Document {
   uploadDate: Date;
   createdAt: Date;
   notes?: string;
+  url?: string;
 }
 
 export const documentTypeLabels: Record<DocumentType, string> = {
