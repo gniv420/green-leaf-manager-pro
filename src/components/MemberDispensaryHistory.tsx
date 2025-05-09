@@ -53,7 +53,15 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
     [memberId]
   );
 
-  if (!dispensaryRecords || dispensaryRecords.length === 0) {
+  if (!dispensaryRecords) {
+    return (
+      <div className="text-center p-4">
+        <p>Cargando datos...</p>
+      </div>
+    );
+  }
+
+  if (dispensaryRecords.length === 0) {
     return (
       <div className="text-center p-8 text-muted-foreground">
         <Cannabis className="mx-auto h-8 w-8 mb-2 opacity-30" />
@@ -78,9 +86,9 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
           <p className="text-sm text-muted-foreground">Total gastado</p>
           <p className="text-xl font-bold">{formatDecimal(totalSpent)} €</p>
         </div>
-        <div className={`p-4 border rounded-lg ${currentBalance < 0 ? 'bg-red-50 border-red-200' : currentBalance > 0 ? 'bg-green-50 border-green-200' : ''}`}>
+        <div className={`p-4 border rounded-lg ${currentBalance < 0 ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800' : currentBalance > 0 ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' : ''}`}>
           <p className="text-sm text-muted-foreground">Saldo monedero</p>
-          <p className={`text-xl font-bold ${currentBalance < 0 ? 'text-red-600' : currentBalance > 0 ? 'text-green-600' : ''}`}>
+          <p className={`text-xl font-bold ${currentBalance < 0 ? 'text-red-600 dark:text-red-400' : currentBalance > 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
             {formatDecimal(currentBalance)} €
           </p>
         </div>
