@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -9,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import {
   Card,
   CardContent,
@@ -70,22 +68,10 @@ const formSchema = z.object({
   dni: z.string().min(9, {
     message: "El DNI debe tener al menos 9 caracteres.",
   }),
-  email: z.string().email({
-    message: "Introduce un email válido.",
-  }),
   phone: z.string().min(9, {
     message: "El teléfono debe tener al menos 9 caracteres.",
   }),
   dob: z.date(),
-  address: z.string().min(2, {
-    message: "La dirección debe tener al menos 2 caracteres.",
-  }),
-  city: z.string().min(2, {
-    message: "La ciudad debe tener al menos 2 caracteres.",
-  }),
-  postalCode: z.string().min(5, {
-    message: "El código postal debe tener al menos 5 caracteres.",
-  }),
   joinDate: z.date(),
   consumptionGrams: z.number(),
   notes: z.string().optional(),
@@ -264,12 +250,8 @@ const MemberDetails = () => {
       firstName: '',
       lastName: '',
       dni: '',
-      email: '',
       phone: '',
       dob: new Date(),
-      address: '',
-      city: '',
-      postalCode: '',
       joinDate: new Date(),
       consumptionGrams: 0,
       notes: '',
@@ -285,12 +267,8 @@ const MemberDetails = () => {
         firstName: member.firstName,
         lastName: member.lastName,
         dni: member.dni,
-        email: member.email,
         phone: member.phone,
         dob: member.dob,
-        address: member.address,
-        city: member.city,
-        postalCode: member.postalCode,
         joinDate: member.joinDate,
         consumptionGrams: member.consumptionGrams,
         notes: member.notes || '',
@@ -348,12 +326,8 @@ const MemberDetails = () => {
         firstName: data.firstName,
         lastName: data.lastName,
         dni: data.dni,
-        email: data.email,
         phone: data.phone,
         dob: data.dob,
-        address: data.address,
-        city: data.city,
-        postalCode: data.postalCode,
         joinDate: data.joinDate,
         consumptionGrams: data.consumptionGrams,
         notes: data.notes,
@@ -622,22 +596,6 @@ const MemberDetails = () => {
                 />
                 <FormField
                   control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Email" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Email del socio.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
@@ -668,54 +626,6 @@ const MemberDetails = () => {
                       </FormControl>
                       <FormDescription>
                         Fecha de nacimiento del socio.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Dirección</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Dirección" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Dirección del socio.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ciudad</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ciudad" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Ciudad del socio.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="postalCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Código Postal</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Código Postal" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Código Postal del socio.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -860,10 +770,6 @@ const MemberDetails = () => {
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Email</h3>
-                  <p>{member.email || "No especificado"}</p>
-                </div>
-                <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Teléfono</h3>
                   <p>{member.phone || "No especificado"}</p>
                 </div>
@@ -890,11 +796,6 @@ const MemberDetails = () => {
                      member.status === 'inactive' ? 'Inactivo' : 
                      'Pendiente'}
                   </Badge>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Dirección</h3>
-                  <p>{member.address || "No especificada"}</p>
-                  <p>{member.postalCode} {member.city}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Código RFID</h3>
