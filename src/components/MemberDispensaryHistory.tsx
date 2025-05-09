@@ -53,12 +53,6 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
     );
   }
 
-  // Helper function to format numbers with comma decimal separator
-  const formatNumber = (value: any): string => {
-    const num = typeof value === 'number' ? value : Number(value);
-    return isNaN(num) ? '0,00' : num.toFixed(2).replace('.', ',');
-  };
-
   // Calcular totales
   const totalDispensed = dispensaryRecords.reduce((sum, record) => sum + record.quantity, 0);
   const totalSpent = dispensaryRecords.reduce((sum, record) => sum + record.price, 0);
