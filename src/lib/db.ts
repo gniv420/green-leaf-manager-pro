@@ -1,4 +1,3 @@
-
 import Dexie, { Table } from 'dexie';
 
 import { ProductType } from './product-types';
@@ -34,6 +33,7 @@ export interface Member {
   status: 'active' | 'inactive' | 'pending';
   balance?: number;
   sponsorId?: number | null;
+  rfidCode?: string;  // Added rfidCode property
   createdAt: Date;
   updatedAt: Date;
 }
@@ -138,6 +138,11 @@ class ClubDatabase extends Dexie {
     // Add index for openedAt in cashRegisters
     this.version(4).stores({
       cashRegisters: "++id, openDate, closeDate, status, openedAt"
+    });
+    
+    // Add index for rfidCode in members table
+    this.version(5).stores({
+      members: "++id, memberCode, dni, firstName, lastName, rfidCode, status"
     });
   }
 
