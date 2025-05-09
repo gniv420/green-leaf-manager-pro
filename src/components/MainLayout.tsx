@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -45,6 +45,20 @@ export const MainLayout = () => {
   const { toggleSidebar, state } = useSidebar();
   
   console.log("MainLayout rendering, current path:", pathname);
+  
+  useEffect(() => {
+    console.log("MainLayout mounted/updated with path:", pathname);
+    
+    // Parse the path to check if we're on a member details page
+    if (pathname.startsWith('/members/')) {
+      const memberId = pathname.split('/').pop();
+      console.log("On member details page for ID:", memberId);
+    }
+    
+    return () => {
+      console.log("MainLayout unmounting from path:", pathname);
+    };
+  }, [pathname]);
   
   const sidebarItems: SidebarItem[] = [
     {

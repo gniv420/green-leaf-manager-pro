@@ -17,6 +17,8 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
   const [showSensitiveInfo, setShowSensitiveInfo] = useState(false);
   const { theme } = useTheme();
 
+  console.log("Rendering MemberCard for member:", member.id, member.firstName, member.lastName);
+
   const toggleSensitiveInfo = () => {
     setShowSensitiveInfo(prev => !prev);
   };
@@ -32,6 +34,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
   // Función para navegar a la página de dispensario preseleccionando el socio
   const handleDispensaryClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log("Dispensary click for member:", member.id);
     if (onDispensary) {
       onDispensary();
     } else {
@@ -51,19 +54,34 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
   const balance = member.balance ?? 0;
 
   // Explicit navigation to member details with proper ID
-  const handleDetailsClick = () => {
+  const handleDetailsClick = (e?: React.MouseEvent) => {
+    // If event is provided, stop it from propagating (for button clicks)
+    if (e) e.stopPropagation();
+    
     if (member.id) {
       console.log("Navigating to member details with ID:", member.id);
       const url = `/members/${member.id}`;
       console.log("Navigation URL:", url);
-      navigate(url);
+      
+      // Try with different navigation methods to see if one works
+      try {
+        console.log("Using navigate() method");
+        navigate(url);
+      } catch (error) {
+        console.error("Navigation error:", error);
+        console.log("Trying fallback navigation with window.location");
+        window.location.href = url;
+      }
     } else {
       console.error("Member ID is undefined, cannot navigate");
     }
   };
 
   return (
-    <Card className={`h-full transition-colors ${theme === 'dark' ? 'bg-secondary/20' : ''}`} onClick={handleDetailsClick}>
+    <Card 
+      className={`h-full transition-colors ${theme === 'dark' ? 'bg-secondary/20' : ''} cursor-pointer`} 
+      onClick={handleDetailsClick}
+    >
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>
@@ -128,7 +146,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
         <Button 
           variant="default" 
           className="w-full bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
-          onClick={handleDetailsClick}
+          onClick={(e) => handleDetailsClick(e)}
         >
           <UserRound className="mr-2 h-4 w-4" />
           Detalles

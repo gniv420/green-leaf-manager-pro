@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Member } from '@/lib/db';
 import { Button } from '@/components/ui/button';
@@ -179,6 +179,11 @@ const BalanceAdjustmentDialog: React.FC<{
   );
 };
 
+// Debug function to help trace component lifecycle and routing
+function debugMemberDetails(message: string, data?: any) {
+  console.log(`[MemberDetails] ${message}`, data || '');
+}
+
 const MemberDetails = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -192,11 +197,36 @@ const MemberDetails = () => {
 
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { memberId } = useParams<{ memberId: string }>();
+  
+  debugMemberDetails('Component rendering', { memberId, path: location.pathname });
+
+  // Debug any issues with the memberId parameter
+  useEffect(() => {
+    debugMemberDetails('memberId from params', memberId);
+    if (!memberId) {
+      debugMemberDetails('No memberId in params - this is a problem');
+    } else {
+      debugMemberDetails('memberId is valid', { memberId });
+    }
+  }, [memberId]);
 
   const member = useLiveQuery(async () => {
-    if (!memberId) return undefined;
-    return await db.members.get(parseInt(memberId));
+    if (!memberId) {
+      debugMemberDetails('Query aborted - no memberId');
+      return undefined;
+    }
+    
+    debugMemberDetails('Fetching member data for ID', memberId);
+    try {
+      const memberData = await db.members.get(parseInt(memberId));
+      debugMemberDetails('Query result', memberData ? 'Member found' : 'Member not found');
+      return memberData;
+    } catch (error) {
+      debugMemberDetails('Error fetching member', error);
+      return undefined;
+    }
   }, [memberId]);
 
   const dispensaryHistory = useLiveQuery(async () => {
@@ -493,18 +523,32 @@ const MemberDetails = () => {
     }
   };
 
+  // Log when the component is mounted and unmounted
+  useEffect(() => {
+    debugMemberDetails('Component mounted');
+    return () => {
+      debugMemberDetails('Component unmounted');
+    };
+  }, []);
+
   if (!member) {
+    debugMemberDetails('No member data, showing loading state');
     return (
       <div className="container mx-auto py-10">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight">Detalles del Socio</h1>
         </div>
         <div className="flex items-center justify-center h-40">
-          <p className="text-muted-foreground">Cargando información del socio...</p>
+          <p className="text-muted-foreground">Cargando información del socio (ID: {memberId || 'no ID'})...</p>
         </div>
       </div>
     );
   }
+
+  debugMemberDetails('Rendering with member data', { 
+    id: member.id, 
+    name: `${member.firstName} ${member.lastName}` 
+  });
 
   return (
     <div className="container mx-auto py-10">
@@ -969,125 +1013,4 @@ const MemberDetails = () => {
           <DialogHeader>
             <DialogTitle>¿Estás seguro?</DialogTitle>
             <DialogDescription>
-              Esta acción no se puede deshacer. ¿Estás seguro de que quieres eliminar este socio?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setIsDeleteDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete}>
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Subir Documento</DialogTitle>
-            <DialogDescription>
-              Selecciona el tipo de documento y el archivo que deseas subir.
-            </DialogDescription>
-          </DialogHeader>
-          <UploadForm handleFileUpload={handleFileUpload} documentTypes={documentTypes} onClose={() => setIsUploadDialogOpen(false)} />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isDocumentViewOpen} onOpenChange={() => {
-        setIsDocumentViewOpen(false);
-        if (currentDocumentUrl) {
-          releaseDocumentUrl(currentDocumentUrl);
-          setCurrentDocumentUrl(null);
-        }
-      }}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Visualización de Documento</DialogTitle>
-          </DialogHeader>
-          <div className="aspect-w-16 aspect-h-9">
-            {currentDocumentUrl && (
-              <iframe src={currentDocumentUrl} title="Document Preview" className="border-none w-full h-[400px]" />
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => {
-              setIsDocumentViewOpen(false);
-              if (currentDocumentUrl) {
-                releaseDocumentUrl(currentDocumentUrl);
-                setCurrentDocumentUrl(null);
-              }
-            }}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-interface UploadFormProps {
-  handleFileUpload: (file: File | null, documentType: string) => Promise<void>;
-  documentTypes: any[] | undefined;
-  onClose: () => void;
-}
-
-const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes, onClose }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedFile || !selectedDocumentType) {
-      alert('Por favor, selecciona un archivo y un tipo de documento.');
-      return;
-    }
-    await handleFileUpload(selectedFile, selectedDocumentType);
-    onClose();
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="documentType" className="text-right">
-            Tipo de Documento
-          </Label>
-          <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
-            <SelectTrigger className="col-span-3">
-              <SelectValue placeholder="Seleccionar tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(documentTypeLabels).map((type) => (
-                <SelectItem key={type} value={type}>
-                  {documentTypeLabels[type as DocumentType]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="file" className="text-right">
-            Archivo
-          </Label>
-          <Input
-            id="file"
-            type="file"
-            className="col-span-3"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-          />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancelar
-        </Button>
-        <Button type="submit">Subir</Button>
-      </DialogFooter>
-    </form>
-  );
-};
-
-export default MemberDetails;
+              Esta acción no se puede deshacer.
