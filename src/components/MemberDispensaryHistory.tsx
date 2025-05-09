@@ -24,22 +24,27 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
     async () => {
       if (!memberId) return [];
       
-      const records = await db.dispensary
-        .where('memberId')
-        .equals(memberId)
-        .reverse()
-        .sortBy('createdAt');
-      
-      // Obtener información de productos
-      const products = await db.products.toArray();
-      
-      return records.map(record => {
-        const product = products.find(p => p.id === record.productId);
-        return {
-          ...record,
-          productName: product ? product.name : 'Producto desconocido'
-        };
-      });
+      try {
+        const records = await db.dispensary
+          .where('memberId')
+          .equals(memberId)
+          .reverse()
+          .sortBy('createdAt');
+        
+        // Obtener información de productos
+        const products = await db.products.toArray();
+        
+        return records.map(record => {
+          const product = products.find(p => p.id === record.productId);
+          return {
+            ...record,
+            productName: product ? product.name : 'Producto desconocido'
+          };
+        });
+      } catch (error) {
+        console.error("Error loading dispensary records:", error);
+        return [];
+      }
     },
     [memberId]
   );
@@ -48,7 +53,12 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
   const member = useLiveQuery(
     async () => {
       if (!memberId) return null;
-      return db.members.get(memberId);
+      try {
+        return await db.members.get(memberId);
+      } catch (error) {
+        console.error("Error loading member:", error);
+        return null;
+      }
     },
     [memberId]
   );
@@ -71,8 +81,8 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
   }
 
   // Calcular totales
-  const totalDispensed = dispensaryRecords.reduce((sum, record) => sum + record.quantity, 0);
-  const totalSpent = dispensaryRecords.reduce((sum, record) => sum + record.price, 0);
+  const totalDispensed = dispensaryRecords.reduce((sum, record) => sum + (record.quantity || 0), 0);
+  const totalSpent = dispensaryRecords.reduce((sum, record) => sum + (record.price || 0), 0);
   
   // Asegurar que currentBalance siempre sea un número, con valor predeterminado 0
   const currentBalance = member?.balance ?? 0;

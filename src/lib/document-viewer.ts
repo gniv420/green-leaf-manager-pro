@@ -8,8 +8,11 @@ export const openDocument = (document: { data: ArrayBuffer | string, contentType
     let blob;
     if (document.data instanceof ArrayBuffer) {
       blob = new Blob([document.data], { type: document.contentType || 'application/octet-stream' });
-    } else {
+    } else if (typeof document.data === 'string') {
       blob = new Blob([document.data], { type: document.contentType || 'application/octet-stream' });
+    } else {
+      console.error("Invalid document data format");
+      return null;
     }
     
     // Create a URL for the blob

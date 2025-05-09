@@ -47,6 +47,9 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
     }
   };
 
+  // Ensure balance is always a number
+  const balance = member.balance ?? 0;
+
   return (
     <Card className={`h-full transition-colors ${theme === 'dark' ? 'bg-secondary/20' : ''}`}>
       <CardHeader className="pb-2">
@@ -100,7 +103,9 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onDispensary }) => {
           </div>
           <div className="flex justify-between text-sm mt-2">
             <span className="text-muted-foreground">Saldo:</span>
-            <span className="font-medium text-green-600 dark:text-green-400">{(member.balance || 0).toFixed(2)} €</span>
+            <span className={`font-medium ${balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+              {balance.toFixed(2)} €
+            </span>
           </div>
         </div>
       </CardContent>
