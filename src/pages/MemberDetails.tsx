@@ -19,10 +19,8 @@ import { Badge } from '@/components/ui/badge';
 import {
   Pencil,
   Trash,
-  File,
-  Eye,
-  Plus,
   AlertCircle,
+  Plus,
 } from 'lucide-react';
 import {
   Form,
@@ -53,10 +51,7 @@ import {
 } from "@/components/ui/dialog"
 import { formatDecimal } from '@/lib/utils';
 import MemberDispensaryHistory from '@/components/MemberDispensaryHistory';
-import { ImageIcon } from 'lucide-react';
-import type { DocumentType } from '@/lib/document-types';
-import { documentTypeLabels } from '@/lib/document-types';
-import { openDocument, releaseDocumentUrl } from '@/lib/document-viewer';
+import MemberDocuments from '@/components/MemberDocuments';
 
 const formSchema = z.object({
   firstName: z.string().min(2, {
@@ -174,11 +169,6 @@ function debugMemberDetails(message: string, data?: any) {
 const MemberDetails = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
-  const [currentDocumentUrl, setCurrentDocumentUrl] = useState<string | null>(null);
-  const [currentDocument, setCurrentDocument] = useState<any>(null);
-  const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
   // Añadir estado para el diálogo de ajuste de saldo
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false);
 
@@ -226,16 +216,6 @@ const MemberDetails = () => {
       .sortBy('createdAt');
   }, [memberId]);
 
-  const documentTypes = useLiveQuery(() => db.documents.toArray(), []);
-
-  const documents = useLiveQuery(async () => {
-    if (!memberId) return [];
-    return await db.documents
-      .where('memberId')
-      .equals(parseInt(memberId))
-      .toArray();
-  }, [memberId]);
-
   // Obtenemos el registro de caja abierta para validar
   const currentCashRegister = useLiveQuery(() => {
     return db.cashRegisters
@@ -277,46 +257,6 @@ const MemberDetails = () => {
       });
     }
   }, [member, form]);
-
-  // Clean up document URL when component unmounts or when URL changes
-  useEffect(() => {
-    return () => {
-      if (currentDocumentUrl) {
-        releaseDocumentUrl(currentDocumentUrl);
-      }
-    };
-  }, [currentDocumentUrl]);
-
-  const handleViewDocument = async (doc: any) => {
-    try {
-      // Generate URL from document data
-      const url = openDocument(doc);
-      if (url) {
-        setCurrentDocumentUrl(url);
-        setCurrentDocument(doc);
-        setIsDocumentViewOpen(true);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "No se pudo abrir el documento."
-        });
-      }
-    } catch (error) {
-      console.error("Error al abrir el documento:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Error al abrir el documento."
-      });
-    }
-  };
-
-  const handleConfirmDeleteDocument = (documentId?: number) => {
-    if (!documentId) return;
-    setDocumentToDelete(documentId);
-    setIsDeleteDialogOpen(true);
-  };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!memberId) return;
@@ -372,40 +312,6 @@ const MemberDetails = () => {
       })
     } finally {
       setIsDeleteDialogOpen(false);
-    }
-  };
-
-  // Modify the handleFileUpload function to use a mock function instead of the firebase upload
-  const handleFileUpload = async (file: File | null, docType: string) => {
-    if (!memberId || !file) return;
-
-    try {
-      // Guardar la referencia en la base de datos
-      await db.documents.add({
-        memberId: parseInt(memberId),
-        type: docType as DocumentType,
-        uploadDate: new Date(),
-        name: file.name,
-        fileName: file.name,
-        contentType: file.type,
-        size: file.size,
-        data: await file.arrayBuffer(),
-        createdAt: new Date(),
-      });
-
-      toast({
-        title: "Documento subido.",
-        description: "El documento ha sido subido correctamente.",
-      })
-    } catch (error) {
-      console.error("Error al subir el documento:", error);
-      toast({
-        variant: "destructive",
-        title: "Error.",
-        description: "No se pudo subir el documento.",
-      })
-    } finally {
-      setIsUploadDialogOpen(false);
     }
   };
 
@@ -475,27 +381,6 @@ const MemberDetails = () => {
         title: "Error",
         description: "No se pudo actualizar el saldo del monedero"
       });
-    }
-  };
-
-  const handleDeleteDocument = async () => {
-    if (!documentToDelete) return;
-
-    try {
-      await db.documents.delete(documentToDelete);
-      toast({
-        title: "Documento eliminado.",
-        description: "El documento ha sido eliminado correctamente.",
-      })
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error.",
-        description: "No se pudo eliminar el documento.",
-      })
-    } finally {
-      setIsDeleteDialogOpen(false);
-      setDocumentToDelete(null);
     }
   };
 
@@ -839,56 +724,8 @@ const MemberDetails = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle>Documentos</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => setIsUploadDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Subir documento
-                </Button>
-              </div>
-              <CardDescription>
-                Documentos asociados al socio
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {documents && documents.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {documents.map((doc) => (
-                    <Card key={doc.id} className="shadow-sm">
-                      <CardHeader>
-                        <CardTitle className="flex items-center">
-                          <File className="mr-2 h-4 w-4" />
-                          {doc.name}
-                        </CardTitle>
-                        <CardDescription>
-                          {doc.type} • {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex justify-between">
-                          <Button variant="secondary" size="sm" onClick={() => handleViewDocument(doc)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleConfirmDeleteDocument(doc.id)}>
-                            <Trash className="mr-2 h-4 w-4" />
-                            Eliminar
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-32">
-                  <ImageIcon className="h-6 w-6 mr-2 text-muted-foreground" />
-                  <p className="text-muted-foreground">No hay documentos asociados a este socio.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Use MemberDocuments component instead of inline document handling */}
+          <MemberDocuments memberId={parseInt(memberId)} />
           
           <Card>
             <CardHeader className="pb-2">
