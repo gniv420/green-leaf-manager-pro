@@ -30,7 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { File, Eye, Plus, Trash, ImageIcon } from 'lucide-react';
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { File, Eye, Plus, Trash, ImageIcon, FileText } from 'lucide-react';
 import type { DocumentType } from '@/lib/document-types';
 
 interface MemberDocumentsProps {
@@ -38,7 +39,7 @@ interface MemberDocumentsProps {
 }
 
 interface UploadFormProps {
-  handleFileUpload: (file: File | null, documentType: string) => Promise<void>;
+  handleFileUpload: (file: File | null, documentType: string, customName: string) => Promise<void>;
   documentTypes: any[] | undefined;
   onClose: () => void;
 }
@@ -46,6 +47,7 @@ interface UploadFormProps {
 const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes, onClose }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
+  const [customName, setCustomName] = useState<string>('');
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -53,9 +55,23 @@ const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes
       alert('Por favor, selecciona un archivo y un tipo de documento.');
       return;
     }
-    await handleFileUpload(selectedFile, selectedDocumentType);
+    
+    // Use the custom name if provided, otherwise use the original filename
+    const documentName = customName.trim() ? customName : selectedFile.name;
+    
+    await handleFileUpload(selectedFile, selectedDocumentType, documentName);
     onClose();
   };
+
+  // Update the custom name field when a file is selected
+  useEffect(() => {
+    if (selectedFile) {
+      const fileNameWithoutExtension = selectedFile.name.split('.').slice(0, -1).join('.');
+      setCustomName(fileNameWithoutExtension);
+    } else {
+      setCustomName('');
+    }
+  }, [selectedFile]);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -76,6 +92,18 @@ const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="customName" className="text-right">
+            Nombre del documento
+          </Label>
+          <Input
+            id="customName"
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            placeholder="Introduce un nombre personalizado"
+            className="col-span-3"
+          />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="file" className="text-right">
@@ -99,11 +127,23 @@ const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes
   );
 };
 
+// Helper function to get a suitable icon based on file type
+const getDocumentIcon = (contentType: string) => {
+  if (contentType.includes('image')) {
+    return <ImageIcon className="h-6 w-6" />;
+  } else if (contentType.includes('pdf')) {
+    return <FileText className="h-6 w-6" />;
+  } else {
+    return <File className="h-6 w-6" />;
+  }
+};
+
 const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [currentDocumentUrl, setCurrentDocumentUrl] = useState<string | null>(null);
+  const [documentThumbnail, setDocumentThumbnail] = useState<string | null>(null);
   const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
   
@@ -131,8 +171,21 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
       if (currentDocumentUrl) {
         releaseDocumentUrl(currentDocumentUrl);
       }
+      if (documentThumbnail && documentThumbnail !== currentDocumentUrl) {
+        releaseDocumentUrl(documentThumbnail);
+      }
     };
-  }, [currentDocumentUrl]);
+  }, [currentDocumentUrl, documentThumbnail]);
+
+  const createThumbnail = async (doc: Document) => {
+    try {
+      // Generate URL from document data for thumbnail
+      return openDocument(doc);
+    } catch (error) {
+      console.error("Error creating thumbnail:", error);
+      return null;
+    }
+  };
 
   const handleViewDocument = async (doc: Document) => {
     try {
@@ -141,6 +194,11 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
       if (url) {
         setCurrentDocumentUrl(url);
         setCurrentDocument(doc);
+        
+        // Create thumbnail for the document (will be the same URL for image files)
+        const thumbnailUrl = await createThumbnail(doc);
+        setDocumentThumbnail(thumbnailUrl);
+        
         setIsDocumentViewOpen(true);
       } else {
         toast({
@@ -159,7 +217,7 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
     }
   };
 
-  const handleFileUpload = async (file: File | null, docType: string) => {
+  const handleFileUpload = async (file: File | null, docType: string, customName: string) => {
     if (!memberId || !file) return;
 
     try {
@@ -171,7 +229,7 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
         memberId: parseInt(String(memberId)),
         type: docType as DocumentType,
         uploadDate: new Date(),
-        name: file.name,
+        name: customName || file.name, // Use custom name if provided
         fileName: file.name,
         contentType: file.type,
         size: file.size,
@@ -244,8 +302,8 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
                 <Card key={doc.id} className="shadow-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center text-base">
-                      <File className="mr-2 h-4 w-4" />
-                      {doc.name}
+                      {getDocumentIcon(doc.contentType)}
+                      <span className="ml-2 truncate">{doc.name}</span>
                     </CardTitle>
                     <CardDescription>
                       {documentTypeLabels[doc.type]} • {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
@@ -296,22 +354,74 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
           releaseDocumentUrl(currentDocumentUrl);
           setCurrentDocumentUrl(null);
         }
+        if (documentThumbnail) {
+          releaseDocumentUrl(documentThumbnail);
+          setDocumentThumbnail(null);
+        }
       }}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Visualización de Documento</DialogTitle>
+            <DialogTitle>{currentDocument?.name || 'Visualización de Documento'}</DialogTitle>
           </DialogHeader>
+          
+          {/* Thumbnail preview */}
+          {documentThumbnail && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-2">Vista previa:</h3>
+              <div className="border rounded-md overflow-hidden">
+                <AspectRatio ratio={16 / 9} className="bg-muted">
+                  {currentDocument?.contentType.includes('image') ? (
+                    <img 
+                      src={documentThumbnail} 
+                      alt={currentDocument?.name || "Vista previa"} 
+                      className="object-contain w-full h-full"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full">
+                      {getDocumentIcon(currentDocument?.contentType || '')}
+                      <span className="ml-2 text-sm">{currentDocument?.fileName}</span>
+                    </div>
+                  )}
+                </AspectRatio>
+              </div>
+            </div>
+          )}
+          
+          {/* Document viewer */}
           <div className="aspect-w-16 aspect-h-9">
             {currentDocumentUrl && (
               <iframe src={currentDocumentUrl} title="Document Preview" className="border-none w-full h-[400px]" />
             )}
           </div>
+          
+          {/* Document info */}
+          {currentDocument && (
+            <div className="grid grid-cols-2 gap-2 text-sm mt-2">
+              <div>
+                <span className="font-medium">Tipo:</span> {documentTypeLabels[currentDocument.type]}
+              </div>
+              <div>
+                <span className="font-medium">Tamaño:</span> {Math.round(currentDocument.size / 1024)} KB
+              </div>
+              <div>
+                <span className="font-medium">Fecha:</span> {format(new Date(currentDocument.uploadDate), 'dd/MM/yyyy')}
+              </div>
+              <div>
+                <span className="font-medium">Archivo original:</span> {currentDocument.fileName}
+              </div>
+            </div>
+          )}
+          
           <DialogFooter>
             <Button variant="secondary" onClick={() => {
               setIsDocumentViewOpen(false);
               if (currentDocumentUrl) {
                 releaseDocumentUrl(currentDocumentUrl);
                 setCurrentDocumentUrl(null);
+              }
+              if (documentThumbnail) {
+                releaseDocumentUrl(documentThumbnail);
+                setDocumentThumbnail(null);
               }
             }}>
               Cerrar
