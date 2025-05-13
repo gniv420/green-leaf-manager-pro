@@ -1,4 +1,3 @@
-
 # Cannabis Club Manager
 
 Aplicación para la gestión integral de clubes de cannabis, incluyendo gestión de socios, dispensario, inventario y caja.
@@ -106,7 +105,131 @@ npm run build
    sudo chown gniv:gniv /opt/club-manager/db
    ```
 
-2. Inicializar la base de datos:
+2. Crear el archivo de configuración inicial de la base de datos:
+   ```bash
+   # Crear el archivo setup.sql
+   cat > setup.sql << EOL
+   -- Cannabis Club Manager Database Setup
+   
+   -- Create tables
+   CREATE TABLE IF NOT EXISTS users (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     username TEXT NOT NULL,
+     password TEXT NOT NULL,
+     fullName TEXT NOT NULL,
+     isAdmin INTEGER NOT NULL,
+     createdAt TEXT NOT NULL,
+     lastLogin TEXT
+   );
+   
+   CREATE TABLE IF NOT EXISTS members (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     memberCode TEXT NOT NULL,
+     firstName TEXT NOT NULL,
+     lastName TEXT NOT NULL,
+     dni TEXT NOT NULL,
+     email TEXT,
+     phone TEXT NOT NULL,
+     dob TEXT NOT NULL,
+     address TEXT,
+     city TEXT,
+     postalCode TEXT,
+     joinDate TEXT NOT NULL,
+     consumptionGrams REAL NOT NULL,
+     notes TEXT,
+     status TEXT NOT NULL,
+     balance REAL,
+     sponsorId INTEGER,
+     rfidCode TEXT,
+     createdAt TEXT NOT NULL,
+     updatedAt TEXT NOT NULL
+   );
+   
+   CREATE TABLE IF NOT EXISTS products (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     name TEXT NOT NULL,
+     description TEXT,
+     category TEXT NOT NULL,
+     type TEXT NOT NULL,
+     price REAL NOT NULL,
+     costPrice REAL,
+     stockGrams REAL NOT NULL,
+     isVisible INTEGER,
+     image TEXT,
+     notes TEXT,
+     createdAt TEXT NOT NULL,
+     updatedAt TEXT NOT NULL
+   );
+   
+   CREATE TABLE IF NOT EXISTS dispensary (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     memberId INTEGER NOT NULL,
+     productId INTEGER NOT NULL,
+     quantity REAL NOT NULL,
+     price REAL NOT NULL,
+     paymentMethod TEXT NOT NULL,
+     notes TEXT,
+     userId INTEGER NOT NULL,
+     createdAt TEXT NOT NULL
+   );
+   
+   CREATE TABLE IF NOT EXISTS cash_registers (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     openDate TEXT NOT NULL,
+     closeDate TEXT,
+     initialBalance REAL NOT NULL,
+     finalBalance REAL,
+     status TEXT NOT NULL,
+     openingAmount REAL NOT NULL,
+     closingAmount REAL,
+     userId INTEGER NOT NULL,
+     notes TEXT,
+     openedAt TEXT NOT NULL,
+     closedAt TEXT
+   );
+   
+   CREATE TABLE IF NOT EXISTS cash_transactions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     cashRegisterId INTEGER NOT NULL,
+     type TEXT NOT NULL,
+     amount REAL NOT NULL,
+     concept TEXT NOT NULL,
+     notes TEXT,
+     userId INTEGER NOT NULL,
+     paymentMethod TEXT NOT NULL,
+     createdAt TEXT NOT NULL
+   );
+   
+   CREATE TABLE IF NOT EXISTS member_transactions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     memberId INTEGER NOT NULL,
+     amount REAL NOT NULL,
+     type TEXT NOT NULL,
+     notes TEXT,
+     userId INTEGER NOT NULL,
+     createdAt TEXT NOT NULL
+   );
+   
+   CREATE TABLE IF NOT EXISTS documents (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     memberId INTEGER NOT NULL,
+     type TEXT NOT NULL,
+     uploadDate TEXT NOT NULL,
+     name TEXT NOT NULL,
+     fileName TEXT NOT NULL,
+     contentType TEXT NOT NULL,
+     size INTEGER NOT NULL,
+     filePath TEXT NOT NULL,
+     createdAt TEXT NOT NULL
+   );
+   
+   -- Insert initial admin user
+   INSERT INTO users (username, password, fullName, isAdmin, createdAt)
+   VALUES ('admin', '1234', 'Administrator', 1, datetime('now'));
+   EOL
+   ```
+
+3. Inicializar la base de datos:
    ```bash
    # Crear la base de datos SQLite
    sqlite3 /opt/club-manager/db/club.db < setup.sql
