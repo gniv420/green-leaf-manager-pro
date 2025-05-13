@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -361,7 +360,7 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
         </DialogContent>
       </Dialog>
 
-      {/* View Document Dialog */}
+      {/* View Document Dialog - Making the preview smaller */}
       <Dialog open={isDocumentViewOpen} onOpenChange={() => {
         setIsDocumentViewOpen(false);
         if (currentDocumentUrl) {
@@ -373,17 +372,34 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
           setDocumentThumbnail(null);
         }
       }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>{currentDocument?.name || 'Visualización de Documento'}</DialogTitle>
           </DialogHeader>
           
-          {/* Thumbnail preview for images */}
-          {isImage(currentDocument?.contentType || '') && documentThumbnail && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium mb-2">Vista previa:</h3>
-              <div className="border rounded-md overflow-hidden">
-                <AspectRatio ratio={16 / 9} className="bg-muted">
+          <div className="flex flex-col space-y-4">
+            {/* Document info */}
+            {currentDocument && (
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="font-medium">Tipo:</span> {documentTypeLabels[currentDocument.type]}
+                </div>
+                <div>
+                  <span className="font-medium">Tamaño:</span> {Math.round(currentDocument.size / 1024)} KB
+                </div>
+                <div>
+                  <span className="font-medium">Fecha:</span> {format(new Date(currentDocument.uploadDate), 'dd/MM/yyyy')}
+                </div>
+                <div>
+                  <span className="font-medium">Archivo original:</span> {currentDocument.fileName}
+                </div>
+              </div>
+            )}
+            
+            {/* Thumbnail preview for images - made smaller */}
+            {isImage(currentDocument?.contentType || '') && documentThumbnail && (
+              <div className="border rounded-md overflow-hidden max-w-[300px] mx-auto">
+                <AspectRatio ratio={4 / 3} className="bg-muted">
                   <img 
                     src={documentThumbnail} 
                     alt={currentDocument?.name || "Vista previa"}
@@ -392,64 +408,44 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
                   />
                 </AspectRatio>
               </div>
-            </div>
-          )}
-          
-          {/* Non-image document representation */}
-          {!isImage(currentDocument?.contentType || '') && currentDocument && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium mb-2">Tipo de archivo:</h3>
-              <div className="border rounded-md p-4 flex items-center justify-center">
+            )}
+            
+            {/* Non-image document representation - made smaller */}
+            {!isImage(currentDocument?.contentType || '') && currentDocument && (
+              <div className="border rounded-md p-4 flex items-center justify-center max-w-[300px] mx-auto">
                 <div className="flex flex-col items-center">
                   {getDocumentIcon(currentDocument.contentType)}
                   <span className="mt-2 text-sm">{currentDocument.fileName}</span>
                 </div>
               </div>
-            </div>
-          )}
-          
-          {/* Error state */}
-          {thumbnailError && (
-            <div className="flex items-center justify-center p-4 border rounded-md mb-4">
-              <div className="flex flex-col items-center text-destructive">
-                <FileWarning className="h-10 w-10 mb-2" />
-                <p>No se pudo cargar la vista previa del documento</p>
+            )}
+            
+            {/* Error state */}
+            {thumbnailError && (
+              <div className="flex items-center justify-center p-4 border rounded-md">
+                <div className="flex flex-col items-center text-destructive">
+                  <FileWarning className="h-10 w-10 mb-2" />
+                  <p>No se pudo cargar la vista previa del documento</p>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {/* Document viewer */}
-          {currentDocumentUrl && (
-            <div className="aspect-w-16 aspect-h-9">
-              <iframe 
-                src={currentDocumentUrl} 
-                title="Document Preview" 
-                className="border-none w-full h-[400px]" 
-                onError={() => {
-                  console.log("Error loading document in iframe");
-                  setThumbnailError(true);
-                }}
-              />
-            </div>
-          )}
-          
-          {/* Document info */}
-          {currentDocument && (
-            <div className="grid grid-cols-2 gap-2 text-sm mt-4">
-              <div>
-                <span className="font-medium">Tipo:</span> {documentTypeLabels[currentDocument.type]}
+            )}
+            
+            {/* Document viewer - made much smaller */}
+            {currentDocumentUrl && !isImage(currentDocument?.contentType || '') && (
+              <div className="border rounded-md overflow-hidden max-w-[300px] mx-auto">
+                <iframe 
+                  src={currentDocumentUrl} 
+                  title="Document Preview" 
+                  className="border-none w-full"
+                  style={{ height: '200px' }}
+                  onError={() => {
+                    console.log("Error loading document in iframe");
+                    setThumbnailError(true);
+                  }}
+                />
               </div>
-              <div>
-                <span className="font-medium">Tamaño:</span> {Math.round(currentDocument.size / 1024)} KB
-              </div>
-              <div>
-                <span className="font-medium">Fecha:</span> {format(new Date(currentDocument.uploadDate), 'dd/MM/yyyy')}
-              </div>
-              <div>
-                <span className="font-medium">Archivo original:</span> {currentDocument.fileName}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
           
           <DialogFooter className="mt-4">
             <Button variant="secondary" onClick={() => {
