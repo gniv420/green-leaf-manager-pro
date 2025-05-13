@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import { Document, documentTypeLabels } from '@/lib/document-types';
 import { openDocument, releaseDocumentUrl } from '@/lib/document-viewer';
 import { format } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Card,
   CardContent,
@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { File, Eye, Plus, Trash, ImageIcon, FileText } from 'lucide-react';
+import { File, Eye, Plus, Trash, ImageIcon, FileText, FileWarning } from 'lucide-react';
 import type { DocumentType } from '@/lib/document-types';
 
 interface MemberDocumentsProps {
@@ -138,6 +138,11 @@ const getDocumentIcon = (contentType: string) => {
   }
 };
 
+// Check if a file is an image
+const isImage = (contentType: string): boolean => {
+  return contentType.includes('image');
+};
+
 const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
@@ -146,6 +151,7 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
   const [documentThumbnail, setDocumentThumbnail] = useState<string | null>(null);
   const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
+  const [thumbnailError, setThumbnailError] = useState(false);
   
   const { toast } = useToast();
   
@@ -179,40 +185,48 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
 
   const createThumbnail = async (doc: Document) => {
     try {
-      // Generate URL from document data for thumbnail
-      return openDocument(doc);
+      // Reset thumbnail error state
+      setThumbnailError(false);
+      
+      // For images, use the document itself as the thumbnail
+      if (isImage(doc.contentType)) {
+        return openDocument(doc);
+      }
+      
+      // For non-images, we'll use a generic icon representation instead
+      return null;
     } catch (error) {
       console.error("Error creating thumbnail:", error);
+      setThumbnailError(true);
       return null;
     }
   };
 
   const handleViewDocument = async (doc: Document) => {
     try {
+      setThumbnailError(false);
+      setCurrentDocument(doc);
+      
       // Generate URL from document data
       const url = openDocument(doc);
-      if (url) {
-        setCurrentDocumentUrl(url);
-        setCurrentDocument(doc);
-        
-        // Create thumbnail for the document (will be the same URL for image files)
-        const thumbnailUrl = await createThumbnail(doc);
-        setDocumentThumbnail(thumbnailUrl);
-        
-        setIsDocumentViewOpen(true);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "No se pudo abrir el documento."
-        });
+      
+      if (!url) {
+        throw new Error("No se pudo generar URL del documento");
       }
+      
+      setCurrentDocumentUrl(url);
+      
+      // Create thumbnail for the document (for images only)
+      const thumbnailUrl = isImage(doc.contentType) ? url : null;
+      setDocumentThumbnail(thumbnailUrl);
+      
+      setIsDocumentViewOpen(true);
     } catch (error) {
       console.error("Error al abrir el documento:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Error al abrir el documento."
+        description: "No se pudo abrir el documento."
       });
     }
   };
@@ -364,39 +378,64 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
             <DialogTitle>{currentDocument?.name || 'Visualización de Documento'}</DialogTitle>
           </DialogHeader>
           
-          {/* Thumbnail preview */}
-          {documentThumbnail && (
+          {/* Thumbnail preview for images */}
+          {isImage(currentDocument?.contentType || '') && documentThumbnail && (
             <div className="mb-4">
               <h3 className="text-sm font-medium mb-2">Vista previa:</h3>
               <div className="border rounded-md overflow-hidden">
                 <AspectRatio ratio={16 / 9} className="bg-muted">
-                  {currentDocument?.contentType.includes('image') ? (
-                    <img 
-                      src={documentThumbnail} 
-                      alt={currentDocument?.name || "Vista previa"} 
-                      className="object-contain w-full h-full"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-full h-full">
-                      {getDocumentIcon(currentDocument?.contentType || '')}
-                      <span className="ml-2 text-sm">{currentDocument?.fileName}</span>
-                    </div>
-                  )}
+                  <img 
+                    src={documentThumbnail} 
+                    alt={currentDocument?.name || "Vista previa"}
+                    className="object-contain w-full h-full"
+                    onError={() => setThumbnailError(true)}
+                  />
                 </AspectRatio>
               </div>
             </div>
           )}
           
+          {/* Non-image document representation */}
+          {!isImage(currentDocument?.contentType || '') && currentDocument && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-2">Tipo de archivo:</h3>
+              <div className="border rounded-md p-4 flex items-center justify-center">
+                <div className="flex flex-col items-center">
+                  {getDocumentIcon(currentDocument.contentType)}
+                  <span className="mt-2 text-sm">{currentDocument.fileName}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Error state */}
+          {thumbnailError && (
+            <div className="flex items-center justify-center p-4 border rounded-md mb-4">
+              <div className="flex flex-col items-center text-destructive">
+                <FileWarning className="h-10 w-10 mb-2" />
+                <p>No se pudo cargar la vista previa del documento</p>
+              </div>
+            </div>
+          )}
+          
           {/* Document viewer */}
-          <div className="aspect-w-16 aspect-h-9">
-            {currentDocumentUrl && (
-              <iframe src={currentDocumentUrl} title="Document Preview" className="border-none w-full h-[400px]" />
-            )}
-          </div>
+          {currentDocumentUrl && (
+            <div className="aspect-w-16 aspect-h-9">
+              <iframe 
+                src={currentDocumentUrl} 
+                title="Document Preview" 
+                className="border-none w-full h-[400px]" 
+                onError={() => {
+                  console.log("Error loading document in iframe");
+                  setThumbnailError(true);
+                }}
+              />
+            </div>
+          )}
           
           {/* Document info */}
           {currentDocument && (
-            <div className="grid grid-cols-2 gap-2 text-sm mt-2">
+            <div className="grid grid-cols-2 gap-2 text-sm mt-4">
               <div>
                 <span className="font-medium">Tipo:</span> {documentTypeLabels[currentDocument.type]}
               </div>
@@ -412,7 +451,7 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
             </div>
           )}
           
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <Button variant="secondary" onClick={() => {
               setIsDocumentViewOpen(false);
               if (currentDocumentUrl) {
