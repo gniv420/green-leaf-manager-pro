@@ -52,7 +52,7 @@ npm run build
 
 - IP: 192.168.1.173
 - DNS: gniv.zapto.org
-- Usuario SSH: pi
+- Usuario SSH: gniv
 - Puerto: 22
 
 #### Preparación del sistema Raspberry Pi
@@ -103,7 +103,7 @@ npm run build
 1. Crear el directorio para la base de datos:
    ```bash
    sudo mkdir -p /opt/club-manager/db
-   sudo chown pi:pi /opt/club-manager/db
+   sudo chown gniv:gniv /opt/club-manager/db
    ```
 
 2. Inicializar la base de datos:
@@ -112,7 +112,7 @@ npm run build
    sqlite3 /opt/club-manager/db/club.db < setup.sql
    
    # Asignar permisos adecuados
-   sudo chown pi:pi /opt/club-manager/db/club.db
+   sudo chown gniv:gniv /opt/club-manager/db/club.db
    sudo chmod 664 /opt/club-manager/db/club.db
    ```
 
@@ -167,7 +167,7 @@ npm run build
        listen 80;
        server_name gniv.zapto.org;
    
-       root /home/pi/apps/cannabis-club-manager/dist;
+       root /home/gniv/apps/cannabis-club-manager/dist;
        index index.html;
    
        location / {
@@ -212,7 +212,7 @@ npm run build
 
 2. Transferir el archivo a la Raspberry Pi:
    ```bash
-   scp club-export.sql pi@192.168.1.173:/tmp/
+   scp club-export.sql gniv@192.168.1.173:/tmp/
    ```
    
 3. Importar datos en la Raspberry Pi:
