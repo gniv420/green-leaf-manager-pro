@@ -215,9 +215,12 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
       
       setCurrentDocumentUrl(url);
       
-      // Create thumbnail for the document (for images only)
-      const thumbnailUrl = isImage(doc.contentType) ? url : null;
-      setDocumentThumbnail(thumbnailUrl);
+      // For images, create a thumbnail URL
+      if (isImage(doc.contentType)) {
+        setDocumentThumbnail(url);
+      } else {
+        setDocumentThumbnail(null);
+      }
       
       setIsDocumentViewOpen(true);
     } catch (error) {
@@ -396,9 +399,9 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
               </div>
             )}
             
-            {/* Thumbnail preview for images - made smaller */}
+            {/* Thumbnail preview for images - adjust size to be visible */}
             {isImage(currentDocument?.contentType || '') && documentThumbnail && (
-              <div className="border rounded-md overflow-hidden max-w-[300px] mx-auto">
+              <div className="border rounded-md overflow-hidden w-full max-w-[300px] mx-auto">
                 <AspectRatio ratio={4 / 3} className="bg-muted">
                   <img 
                     src={documentThumbnail} 
@@ -410,9 +413,9 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
               </div>
             )}
             
-            {/* Non-image document representation - made smaller */}
+            {/* Non-image document representation */}
             {!isImage(currentDocument?.contentType || '') && currentDocument && (
-              <div className="border rounded-md p-4 flex items-center justify-center max-w-[300px] mx-auto">
+              <div className="border rounded-md p-6 flex items-center justify-center w-full max-w-[300px] mx-auto">
                 <div className="flex flex-col items-center">
                   {getDocumentIcon(currentDocument.contentType)}
                   <span className="mt-2 text-sm">{currentDocument.fileName}</span>
@@ -427,22 +430,6 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
                   <FileWarning className="h-10 w-10 mb-2" />
                   <p>No se pudo cargar la vista previa del documento</p>
                 </div>
-              </div>
-            )}
-            
-            {/* Document viewer - made much smaller */}
-            {currentDocumentUrl && !isImage(currentDocument?.contentType || '') && (
-              <div className="border rounded-md overflow-hidden max-w-[300px] mx-auto">
-                <iframe 
-                  src={currentDocumentUrl} 
-                  title="Document Preview" 
-                  className="border-none w-full"
-                  style={{ height: '200px' }}
-                  onError={() => {
-                    console.log("Error loading document in iframe");
-                    setThumbnailError(true);
-                  }}
-                />
               </div>
             )}
           </div>
