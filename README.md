@@ -13,6 +13,7 @@ Aplicación para la gestión integral de clubes de cannabis, incluyendo gestión
 - Modo oscuro
 - Diseño responsive
 - Gestión de documentos
+- Soporte para SQLite3 en Raspberry Pi
 
 ## Tecnologías utilizadas
 
@@ -21,16 +22,12 @@ Aplicación para la gestión integral de clubes de cannabis, incluyendo gestión
 - Vite
 - Tailwind CSS
 - shadcn/ui
-- IndexedDB (Dexie.js)
+- IndexedDB (Dexie.js) para desarrollo
+- SQLite3 para producción en Raspberry Pi
 
-## Requisitos del sistema
+## Configuración del entorno
 
-- Node.js 18.x o superior
-- NPM 9.x o superior
-- Mínimo 1GB de RAM
-- 2GB de espacio en disco
-
-## Instalación estándar
+### Versión de desarrollo (local)
 
 ```bash
 # Clonar el repositorio
@@ -49,11 +46,16 @@ npm run dev
 npm run build
 ```
 
-## Instrucciones específicas para Raspberry Pi 3B+
+### Configuración en Raspberry Pi 3B+
 
-La Raspberry Pi 3B+ tiene limitaciones de recursos, pero es posible ejecutar la aplicación siguiendo estos pasos específicos:
+#### Acceso al sistema
 
-### Preparación del sistema
+- IP: 192.168.1.173
+- DNS: gniv.zapto.org
+- Usuario SSH: pi
+- Puerto: 22
+
+#### Preparación del sistema Raspberry Pi
 
 1. Instalar Raspberry Pi OS Lite (64-bit) para mejor rendimiento:
    ```bash
@@ -70,7 +72,7 @@ La Raspberry Pi 3B+ tiene limitaciones de recursos, pero es posible ejecutar la 
    sudo apt upgrade -y
    
    # Instalar dependencias necesarias
-   sudo apt install -y git curl
+   sudo apt install -y git curl sqlite3 nginx
    
    # Instalar Node.js 18.x (versión LTS)
    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
@@ -96,10 +98,30 @@ La Raspberry Pi 3B+ tiene limitaciones de recursos, pero es posible ejecutar la 
    free -h
    ```
 
-### Instalación de la aplicación
+#### Instalación y configuración de la base de datos SQLite3
+
+1. Crear el directorio para la base de datos:
+   ```bash
+   sudo mkdir -p /opt/club-manager/db
+   sudo chown pi:pi /opt/club-manager/db
+   ```
+
+2. Inicializar la base de datos:
+   ```bash
+   # Crear la base de datos SQLite
+   sqlite3 /opt/club-manager/db/club.db < setup.sql
+   
+   # Asignar permisos adecuados
+   sudo chown pi:pi /opt/club-manager/db/club.db
+   sudo chmod 664 /opt/club-manager/db/club.db
+   ```
+
+#### Instalación de la aplicación
 
 1. Clonar el repositorio y configurar:
    ```bash
+   mkdir -p ~/apps
+   cd ~/apps
    git clone https://github.com/tu-usuario/cannabis-club-manager.git
    cd cannabis-club-manager
    
@@ -107,86 +129,144 @@ La Raspberry Pi 3B+ tiene limitaciones de recursos, pero es posible ejecutar la 
    npm install --legacy-peer-deps
    ```
 
-2. Ajustes de rendimiento para la compilación:
+2. Configurar la aplicación:
    ```bash
-   # Crear o editar el archivo .npmrc en la raíz del proyecto
-   echo "maxsockets=1" >> .npmrc
-   echo "network-timeout=100000" >> .npmrc
+   # Crear archivo de configuración para el backend
+   cat > .env << EOL
+   DB_PATH=/opt/club-manager/db/club.db
+   PORT=3000
+   HOST=0.0.0.0
+   EOL
    ```
 
-3. Compilar la aplicación (esto puede tomar tiempo en un Raspberry Pi 3B+):
+3. Compilar la aplicación para producción:
    ```bash
    # Aumentar el timeout del node para evitar problemas durante la compilación
    NODE_OPTIONS=--max_old_space_size=800 npm run build
+   
+   # Instalar PM2 para gestionar el servicio
+   sudo npm install -g pm2
+   
+   # Iniciar el backend
+   pm2 start server.js --name "club-backend"
+   
+   # Configurar para que se inicie automáticamente
+   pm2 save
+   pm2 startup
+   # (ejecutar el comando que te muestra PM2)
    ```
 
-4. Ejecutar la aplicación en modo producción:
+4. Configurar Nginx como proxy inverso:
    ```bash
-   # Instalar un servidor sencillo para servir la aplicación
-   npm install -g serve
-   
-   # Servir la aplicación compilada
-   serve -s dist
+   sudo nano /etc/nginx/sites-available/club-manager
    ```
-
-5. Configurar para que se inicie automáticamente al encender la Raspberry Pi:
+   
+   Añadir la siguiente configuración:
+   ```
+   server {
+       listen 80;
+       server_name gniv.zapto.org;
+   
+       root /home/pi/apps/cannabis-club-manager/dist;
+       index index.html;
+   
+       location / {
+           try_files $uri $uri/ /index.html;
+       }
+   
+       location /api {
+           proxy_pass http://localhost:3000;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+   ```
+   
+   Activar el sitio:
    ```bash
-   # Crear un servicio systemd
-   sudo nano /etc/systemd/system/club-manager.service
+   sudo ln -s /etc/nginx/sites-available/club-manager /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
    ```
-   
-   Contenido del archivo:
-   ```
-   [Unit]
-   Description=Cannabis Club Manager App
-   After=network.target
-   
-   [Service]
-   Type=simple
-   User=pi
-   WorkingDirectory=/home/pi/cannabis-club-manager
-   ExecStart=/usr/bin/serve -s dist
-   Restart=on-failure
-   
-   [Install]
-   WantedBy=multi-user.target
-   ```
-   
-   Activar el servicio:
+
+5. Configurar acceso remoto seguro:
    ```bash
-   sudo systemctl enable club-manager.service
-   sudo systemctl start club-manager.service
+   # Habilitar SSH si no está habilitado
+   sudo raspi-config
+   # Navegar a "Interface Options" > "SSH" > "Yes"
+
+   # Opcional: Configurar autenticación por clave
+   mkdir -p ~/.ssh
+   chmod 700 ~/.ssh
+   # Añadir clave pública al archivo authorized_keys
    ```
 
-### Solución de problemas comunes
+#### Migración de datos desde la versión local
 
-- **Error de memoria durante la instalación o compilación**:
-  ```bash
-  # Aumentar el espacio de memoria para Node.js
-  NODE_OPTIONS=--max_old_space_size=800 npm install
-  # O para la compilación
-  NODE_OPTIONS=--max_old_space_size=800 npm run build
-  ```
+1. En la aplicación local:
+   - Ve a "Configuración" > "Exportar datos (SQLite)"
+   - Guarda el archivo SQL generado
 
-- **Rendimiento lento**:
-  - Asegúrate de utilizar una tarjeta SD de clase 10 o superior
-  - Considera añadir un sistema de enfriamiento para la Raspberry Pi para evitar throttling térmico
-  - Limita las aplicaciones en segundo plano
+2. Transferir el archivo a la Raspberry Pi:
+   ```bash
+   scp club-export.sql pi@192.168.1.173:/tmp/
+   ```
+   
+3. Importar datos en la Raspberry Pi:
+   ```bash
+   sqlite3 /opt/club-manager/db/club.db < /tmp/club-export.sql
+   ```
 
-- **Problemas de conexión**:
-  - Si utilizas Wi-Fi, asegúrate de tener buena señal o considera usar conexión Ethernet
-  - Verifica la configuración de red con `ifconfig`
+#### Actualizaciones y mantenimiento
 
-## Mantenimiento y respaldo
-
-Para garantizar la seguridad de los datos, es recomendable realizar respaldos periódicos:
-
+Para actualizar la aplicación:
 ```bash
-# Respaldar la base de datos IndexedDB
-# En la aplicación, ve a Configuración > Respaldo y genera un archivo de respaldo
+cd ~/apps/cannabis-club-manager
+git pull
+npm install --legacy-peer-deps
+NODE_OPTIONS=--max_old_space_size=800 npm run build
+pm2 restart club-backend
+```
 
-# Copiar el respaldo a un dispositivo externo
-cp ~/Downloads/club-manager-backup-*.json /media/usb/backups/
+Para realizar copias de seguridad de la base de datos:
+```bash
+# Crear copia de seguridad
+sqlite3 /opt/club-manager/db/club.db .dump > /opt/club-manager/db/backup-$(date +%Y%m%d).sql
+
+# Restaurar copia de seguridad
+sqlite3 /opt/club-manager/db/club.db < /opt/club-manager/db/backup-YYYYMMDD.sql
+```
+
+## Solución de problemas comunes
+
+### Problemas de memoria
+```bash
+# Ver uso de memoria
+free -h
+
+# Reiniciar el servicio si hay problemas
+pm2 restart club-backend
+```
+
+### Problemas de base de datos
+```bash
+# Verificar integridad de la base de datos
+sqlite3 /opt/club-manager/db/club.db "PRAGMA integrity_check;"
+
+# Optimizar base de datos
+sqlite3 /opt/club-manager/db/club.db "VACUUM;"
+```
+
+### Logs y monitorización
+```bash
+# Ver logs de la aplicación
+pm2 logs club-backend
+
+# Ver logs del servidor web
+sudo tail -f /var/log/nginx/error.log
 ```
 
 ## Contacto y soporte
