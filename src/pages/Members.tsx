@@ -1,397 +1,259 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { db, Member } from '@/lib/db';
+
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { db } from '@/lib/db';
+import { Member } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Search, Plus, Trash2, Grid, List, Cannabis, Key } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter
-} from '@/components/ui/dialog';
 import MemberCard from '@/components/MemberCard';
-import { useNavigate } from 'react-router-dom';
+import { toast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Search } from 'lucide-react';
 
-const Members = () => {
+export default function Members() {
   const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredMembers, setFilteredMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [rfidCode, setRfidCode] = useState('');
+  const [rfidSearchMode, setRfidSearchMode] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
-  const [isRfidListening, setIsRfidListening] = useState(false);
-  const { toast } = useToast();
-
+  
+  // Cargar miembros
   useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  useEffect(() => {
-    let buffer = '';
-    let lastInputTime = Date.now();
-    const TIMEOUT_MS = 500; // 500ms entre caracteres se considera un nuevo escaneo
-    
-    const keydownListener = (event: KeyboardEvent) => {
-      if (!isRfidListening) return;
-      
-      const currentTime = Date.now();
-      
-      // Si ha pasado mucho tiempo desde la última entrada, reiniciar el buffer
-      if (currentTime - lastInputTime > TIMEOUT_MS) {
-        buffer = '';
-      }
-      
-      lastInputTime = currentTime;
-      
-      // Solo procesar caracteres relevantes
-      if (/[\d\w]/.test(event.key) && event.key.length === 1) {
-        buffer += event.key;
-      }
-      
-      // Enter significa fin del escaneo
-      if (event.key === 'Enter' && buffer.length > 0) {
-        searchByRfid(buffer);
-        buffer = '';
-        event.preventDefault(); // Prevenir comportamiento default del Enter
-      }
-    };
-    
-    if (isRfidListening) {
-      window.addEventListener('keydown', keydownListener);
-    }
-    
-    return () => {
-      window.removeEventListener('keydown', keydownListener);
-    };
-  }, [isRfidListening]);
-
-  const searchByRfid = async (rfidCode: string) => {
-    try {
-      const memberWithRfid = await db.members.where('rfidCode').equals(rfidCode).first();
-      
-      if (memberWithRfid) {
-        // Navegar directamente a la ficha del socio
-        navigate(`/members/${memberWithRfid.id}`);
-        
+    const loadMembers = async () => {
+      try {
+        const memberList = await db.members.toArray();
+        setMembers(memberList);
+        setFilteredMembers(memberList);
+      } catch (error) {
+        console.error('Error loading members:', error);
         toast({
-          title: 'Socio encontrado',
-          description: `${memberWithRfid.firstName} ${memberWithRfid.lastName}`
+          title: 'Error',
+          description: 'No se pudieron cargar los miembros',
+          variant: 'destructive',
         });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadMembers();
+  }, []);
+  
+  // Filtrar miembros basado en la búsqueda
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredMembers(members);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = members.filter(member => 
+        member.firstName.toLowerCase().includes(query) || 
+        member.lastName.toLowerCase().includes(query) || 
+        member.dni.toLowerCase().includes(query) || 
+        member.memberCode.toLowerCase().includes(query)
+      );
+      setFilteredMembers(filtered);
+    }
+  }, [searchQuery, members]);
+  
+  // Escuchar eventos de teclado para el lector RFID
+  useEffect(() => {
+    let rfidBuffer = '';
+    let rfidTimeout: NodeJS.Timeout;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Solo procesar en modo búsqueda RFID o si es un input específico para RFID
+      if (!rfidSearchMode) return;
+      
+      // Evitar procesar teclas si el foco está en un input
+      if (document.activeElement instanceof HTMLInputElement || 
+          document.activeElement instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      // Resetear el timeout cada vez que se pulsa una tecla
+      clearTimeout(rfidTimeout);
+      
+      // Si es un número o una tecla que podría ser parte del código RFID
+      if (/[\d\w]/.test(e.key) && e.key.length === 1) {
+        rfidBuffer += e.key;
+        e.preventDefault(); // Prevenir comportamiento por defecto
+      }
+      
+      // Enter podría indicar el final de la lectura
+      if (e.key === 'Enter' && rfidBuffer.length > 0) {
+        handleRfidSearch(rfidBuffer);
+        rfidBuffer = '';
+        e.preventDefault(); // Prevenir comportamiento por defecto
+      }
+      
+      // Establecer timeout para limpiar el buffer si no hay más input
+      rfidTimeout = setTimeout(() => {
+        if (rfidBuffer.length > 5) {
+          handleRfidSearch(rfidBuffer);
+        }
+        rfidBuffer = '';
+      }, 500); // 500ms timeout
+    };
+    
+    // Añadir event listener
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // Limpiar al desmontar
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(rfidTimeout);
+    };
+  }, [rfidSearchMode]);
+  
+  // Manejar búsqueda por RFID
+  const handleRfidSearch = async (code: string) => {
+    try {
+      if (!code) return;
+      
+      const member = await db.members.where('rfidCode').equals(code).first();
+      
+      if (member) {
+        // Navegar a detalles del miembro si se encuentra
+        toast({
+          title: 'Miembro encontrado',
+          description: `${member.firstName} ${member.lastName}`,
+        });
+        navigate(`/members/${member.id}`);
       } else {
         toast({
+          title: 'Miembro no encontrado',
+          description: 'No se encontró ningún miembro con ese código RFID',
           variant: 'destructive',
-          title: 'No encontrado',
-          description: 'No se encontró ningún socio con ese llavero RFID'
         });
-        setIsRfidListening(false);
       }
     } catch (error) {
       console.error('Error searching by RFID:', error);
       toast({
-        variant: 'destructive',
         title: 'Error',
-        description: 'Error al buscar por RFID'
-      });
-      setIsRfidListening(false);
-    }
-  };
-
-  const toggleRfidListener = () => {
-    setIsRfidListening(prev => !prev);
-    if (!isRfidListening) {
-      toast({
-        title: 'Lector RFID activado',
-        description: 'Acerque el llavero al lector para buscar el socio'
-      });
-    }
-  };
-
-  const fetchMembers = async () => {
-    setIsLoading(true);
-    try {
-      let allMembers = await db.members.toArray();
-      
-      // Ensure all members have default values for essential properties
-      allMembers = allMembers.map(member => ({
-        ...member,
-        memberCode: member.memberCode || '',
-        consumptionGrams: member.consumptionGrams || 0,
-        balance: member.balance || 0,
-        rfidCode: member.rfidCode || '',
-      }));
-      
-      // Generate member codes for those who don't have one
-      let hasChanges = false;
-      for (const member of allMembers) {
-        if (!member.memberCode && member.id) {
-          try {
-            const code = await db.generateMemberCode(member.firstName, member.lastName);
-            await db.members.update(member.id, { memberCode: code });
-            hasChanges = true;
-          } catch (error) {
-            console.error('Error generating member code:', error);
-          }
-        }
-      }
-      
-      // Reload if changes were made
-      if (hasChanges) {
-        allMembers = await db.members.toArray();
-        // Apply default values again for the reloaded data
-        allMembers = allMembers.map(member => ({
-          ...member,
-          memberCode: member.memberCode || '',
-          consumptionGrams: member.consumptionGrams || 0,
-          balance: member.balance || 0,
-          rfidCode: member.rfidCode || '',
-        }));
-      }
-      
-      allMembers.sort((a, b) => {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-      
-      setMembers(allMembers);
-      console.log("Members loaded:", allMembers.length);
-    } catch (error) {
-      console.error('Error fetching members:', error);
-      toast({
+        description: 'Error al buscar por RFID',
         variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudieron cargar los socios'
       });
     } finally {
-      setIsLoading(false);
+      setRfidCode('');
     }
   };
-
-  const handleDelete = async () => {
-    if (!memberToDelete) return;
+  
+  // Confirmar y eliminar miembro
+  const handleDeleteMember = async () => {
+    if (memberToDelete === null) return;
     
     try {
-      // Delete all documents associated with this member first
-      await db.documents.where('memberId').equals(memberToDelete).delete();
-      // Then delete the member
-      await db.members.delete(memberToDelete);
+      await db.deleteMember(memberToDelete);
       
-      // Update the members list
+      // Actualizar listado
       setMembers(members.filter(member => member.id !== memberToDelete));
+      setFilteredMembers(filteredMembers.filter(member => member.id !== memberToDelete));
       
       toast({
-        title: 'Socio eliminado',
-        description: 'El socio ha sido eliminado correctamente'
+        title: 'Éxito',
+        description: 'Miembro eliminado correctamente',
       });
     } catch (error) {
       console.error('Error deleting member:', error);
       toast({
-        variant: 'destructive',
         title: 'Error',
-        description: 'No se pudo eliminar el socio'
+        description: 'Error al eliminar el miembro',
+        variant: 'destructive',
       });
     } finally {
-      setDeleteDialogOpen(false);
       setMemberToDelete(null);
+      setDeleteDialogOpen(false);
     }
-  };
-
-  const confirmDelete = (id?: number) => {
-    if (!id) return;
-    setMemberToDelete(id);
-    setDeleteDialogOpen(true);
   };
   
-  const handleDispensaryForMember = (memberId?: number) => {
-    if (memberId) {
-      navigate(`/dispensary?memberId=${memberId}`);
-    }
+  // Preparar eliminación de miembro
+  const confirmDeleteMember = (memberId: number) => {
+    setMemberToDelete(memberId);
+    setDeleteDialogOpen(true);
   };
 
-  useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  const filteredMembers = members.filter(member => {
-    const searchTermLower = searchTerm.toLowerCase();
-    return (
-      member.firstName.toLowerCase().includes(searchTermLower) ||
-      member.lastName.toLowerCase().includes(searchTermLower) ||
-      member.dni.toLowerCase().includes(searchTermLower) ||
-      (member.memberCode && member.memberCode.toLowerCase().includes(searchTermLower)) ||
-      (member.rfidCode && member.rfidCode.toLowerCase().includes(searchTermLower))
-    );
-  });
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Socios</h1>
-        <Button asChild className="bg-green-600 hover:bg-green-700">
+    <div className="container mx-auto py-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Gestión de Miembros</h1>
+        <div className="space-x-2">
+          <Button 
+            variant={rfidSearchMode ? "default" : "outline"} 
+            onClick={() => setRfidSearchMode(!rfidSearchMode)}
+          >
+            {rfidSearchMode ? "Modo RFID Activo" : "Modo RFID"}
+          </Button>
           <Link to="/members/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Socio
+            <Button>Nuevo Miembro</Button>
           </Link>
-        </Button>
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre, apellido, código, DNI o RFID..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <Button 
-          variant={isRfidListening ? "default" : "outline"}
-          onClick={toggleRfidListener}
-          className={isRfidListening ? "bg-amber-500 hover:bg-amber-600" : ""}
-        >
-          <Key className="mr-2 h-4 w-4" />
-          {isRfidListening ? "Escuchando RFID..." : "Lector RFID"}
-        </Button>
-        
-        <div className="flex space-x-2">
-          <Button 
-            variant={viewMode === 'list' ? 'default' : 'outline'} 
-            size="icon"
-            onClick={() => setViewMode('list')}
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant={viewMode === 'grid' ? 'default' : 'outline'} 
-            size="icon"
-            onClick={() => setViewMode('grid')}
-          >
-            <Grid className="h-4 w-4" />
-          </Button>
         </div>
       </div>
-
-      {isLoading ? (
-        <div className="flex h-[50vh] items-center justify-center">
-          <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+      
+      {/* Barra de búsqueda */}
+      <div className="relative mb-6">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+        <Input
+          placeholder="Buscar miembros por nombre, DNI o código..."
+          className="pl-8"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+      
+      {/* Información de modo RFID */}
+      {rfidSearchMode && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
+          <p className="flex items-center">
+            <span className="mr-2">•</span>
+            <span>Modo RFID activado. Escanee una tarjeta para buscar el miembro.</span>
+          </p>
         </div>
+      )}
+      
+      {loading ? (
+        <div className="text-center py-8">Cargando miembros...</div>
       ) : (
         <>
-          {viewMode === 'list' && (
-            <div className="rounded-md border shadow-sm">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>DNI</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Apellidos</TableHead>
-                    <TableHead>RFID</TableHead>
-                    <TableHead>Consumo (g)</TableHead>
-                    <TableHead>Saldo</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMembers.length > 0 ? (
-                    filteredMembers.map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="font-mono">{member.memberCode || '-'}</TableCell>
-                        <TableCell>{member.dni}</TableCell>
-                        <TableCell>{member.firstName}</TableCell>
-                        <TableCell>{member.lastName}</TableCell>
-                        <TableCell className="font-mono">{member.rfidCode || '-'}</TableCell>
-                        <TableCell>{member.consumptionGrams}</TableCell>
-                        <TableCell>{(member.balance || 0).toFixed(2)} €</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                          >
-                            <Link to={`/members/${member.id}`}>
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDispensaryForMember(member.id)}
-                          >
-                            <Cannabis className="h-4 w-4 text-green-600" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => confirmDelete(member.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={8} className="h-24 text-center">
-                        {searchTerm
-                          ? 'No se encontraron socios que coincidan con la búsqueda'
-                          : 'No hay socios registrados'}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+          {filteredMembers.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {searchQuery ? 'No se encontraron miembros con esa búsqueda' : 'No hay miembros registrados'}
             </div>
-          )}
-
-          {viewMode === 'grid' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredMembers.length > 0 ? (
-                filteredMembers.map((member) => (
-                  <MemberCard 
-                    key={member.id} 
-                    member={member} 
-                    onDispensary={() => handleDispensaryForMember(member.id)} 
-                  />
-                ))
-              ) : (
-                <div className="col-span-full text-center p-8 border rounded-md shadow-sm">
-                  {searchTerm
-                    ? 'No se encontraron socios que coincidan con la búsqueda'
-                    : 'No hay socios registrados'}
-                </div>
-              )}
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredMembers.map(member => (
+                <MemberCard 
+                  key={member.id} 
+                  member={member} 
+                  onDelete={() => member.id && confirmDeleteMember(member.id)} 
+                />
+              ))}
             </div>
           )}
         </>
       )}
-
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar eliminación</DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de que quieres eliminar este socio? Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+      
+      {/* Diálogo de confirmación para eliminar */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El miembro será eliminado permanentemente 
+              junto con todos sus datos asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteMember} className="bg-red-500 hover:bg-red-600">
               Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
-};
-
-export default Members;
+}

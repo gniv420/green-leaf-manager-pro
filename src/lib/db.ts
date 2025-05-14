@@ -1,4 +1,3 @@
-
 // Tipos de datos equivalentes a los que teníamos en Dexie
 export interface User {
   id?: number;
@@ -120,11 +119,10 @@ export class ClubDatabase {
   users = {
     get: async (id: number) => await sqliteDb.getUserById(id),
     where: (field: string) => ({
-      equals: async (value: any) => {
+      equals: (value: any) => {
         if (field === 'username') {
-          const user = await sqliteDb.getUserByUsername(value);
           return {
-            first: async () => user
+            first: async () => await sqliteDb.getUserByUsername(value)
           };
         }
         return { first: async () => null };
@@ -139,11 +137,10 @@ export class ClubDatabase {
   members = {
     get: async (id: number) => await sqliteDb.getMemberById(id),
     where: (field: string) => ({
-      equals: async (value: any) => {
+      equals: (value: any) => {
         if (field === 'rfidCode') {
-          const member = await sqliteDb.getMemberByRfid(value);
           return {
-            first: async () => member
+            first: async () => await sqliteDb.getMemberByRfid(value)
           };
         }
         return { first: async () => null };
@@ -162,11 +159,10 @@ export class ClubDatabase {
     update: async (id: number, product: any) => await sqliteDb.updateProduct(id, product),
     delete: async (id: number) => await sqliteDb.deleteProduct(id),
     where: (field: string) => ({
-      equals: async (value: any) => {
+      equals: (value: any) => {
         if (field === 'isVisible') {
-          const products = value ? await sqliteDb.getVisibleProducts() : [];
           return {
-            toArray: async () => products
+            toArray: async () => value ? await sqliteDb.getVisibleProducts() : []
           };
         }
         return { toArray: async () => [] };
@@ -177,11 +173,10 @@ export class ClubDatabase {
   dispensary = {
     toArray: async () => await sqliteDb.getDispensaryRecords(),
     where: (field: string) => ({
-      equals: async (value: any) => {
+      equals: (value: any) => {
         if (field === 'memberId') {
-          const records = await sqliteDb.getDispensaryForMember(value);
           return {
-            toArray: async () => records
+            toArray: async () => await sqliteDb.getDispensaryForMember(value)
           };
         }
         return { toArray: async () => [] };
@@ -193,11 +188,10 @@ export class ClubDatabase {
 
   documents = {
     where: (field: string) => ({
-      equals: async (value: any) => {
+      equals: (value: any) => {
         if (field === 'memberId') {
-          const docs = await sqliteDb.getDocuments(value);
           return {
-            toArray: async () => docs
+            toArray: async () => await sqliteDb.getDocuments(value)
           };
         }
         return { toArray: async () => [] };
@@ -210,18 +204,20 @@ export class ClubDatabase {
 
   memberTransactions = {
     where: (field: string) => ({
-      equals: async (value: any) => {
+      equals: (value: any) => {
         if (field === 'memberId') {
-          const transactions = await sqliteDb.getMemberTransactions(value);
           return {
-            toArray: async () => transactions,
+            toArray: async () => await sqliteDb.getMemberTransactions(value),
             reverse: () => ({
-              sortBy: async (sortField: string) => transactions.sort((a, b) => {
-                if (sortField === 'createdAt') {
-                  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                }
-                return 0;
-              })
+              sortBy: async (sortField: string) => {
+                const transactions = await sqliteDb.getMemberTransactions(value);
+                return transactions.sort((a, b) => {
+                  if (sortField === 'createdAt') {
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  }
+                  return 0;
+                });
+              }
             })
           };
         }
@@ -238,11 +234,10 @@ export class ClubDatabase {
 
   cashTransactions = {
     where: (field: string) => ({
-      equals: async (value: any) => {
+      equals: (value: any) => {
         if (field === 'cashRegisterId') {
-          const transactions = await sqliteDb.getCashTransactions(value);
           return {
-            toArray: async () => transactions
+            toArray: async () => await sqliteDb.getCashTransactions(value)
           };
         }
         return { toArray: async () => [] };

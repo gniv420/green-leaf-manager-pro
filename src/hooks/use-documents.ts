@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Document, DocumentType } from '@/lib/document-types';
+import { Document } from '@/lib/document-types';
 import { db } from '@/lib/db';
 
 /**
@@ -22,7 +22,7 @@ export function useDocuments(memberId?: number) {
     const fetchDocuments = async () => {
       try {
         setLoading(true);
-        // Use the correct method from the SQLiteDB instance
+        // Use the corrected method that returns documents directly
         const docs = await db.documents.where('memberId').equals(memberId).toArray();
         setDocuments(docs);
       } catch (err) {

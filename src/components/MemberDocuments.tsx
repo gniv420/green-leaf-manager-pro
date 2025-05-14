@@ -1,481 +1,243 @@
+
 import React, { useState, useEffect } from 'react';
-import { useDocuments } from '@/hooks/use-documents';
-import { Document, documentTypeLabels } from '@/lib/document-types';
-import { openDocument, releaseDocumentUrl } from '@/lib/document-viewer';
-import { format } from 'date-fns';
-import { useToast } from '@/components/ui/use-toast';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { File, Eye, Plus, Trash, ImageIcon, FileText, FileWarning } from 'lucide-react';
-import type { DocumentType } from '@/lib/document-types';
+import { Document, DocumentType } from '@/lib/document-types';
 import { db } from '@/lib/db';
+import { toast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import DocumentUploader from '@/components/DocumentUploader';
+import { DocumentViewer } from '@/lib/document-viewer';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { FileIcon, Trash2 } from 'lucide-react';
 
 interface MemberDocumentsProps {
-  memberId?: number;
+  memberId: number;
 }
 
-interface UploadFormProps {
-  handleFileUpload: (file: File | null, documentType: string, customName: string) => Promise<void>;
-  documentTypes: any[] | undefined;
-  onClose: () => void;
-}
+const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isUploaderOpen, setIsUploaderOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-const UploadForm: React.FC<UploadFormProps> = ({ handleFileUpload, documentTypes, onClose }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
-  const [customName, setCustomName] = useState<string>('');
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedFile || !selectedDocumentType) {
-      alert('Por favor, selecciona un archivo y un tipo de documento.');
-      return;
-    }
-    
-    // Use the custom name if provided, otherwise use the original filename
-    const documentName = customName.trim() ? customName : selectedFile.name;
-    
-    await handleFileUpload(selectedFile, selectedDocumentType, documentName);
-    onClose();
-  };
-
-  // Update the custom name field when a file is selected
+  // Cargar documentos
   useEffect(() => {
-    if (selectedFile) {
-      const fileNameWithoutExtension = selectedFile.name.split('.').slice(0, -1).join('.');
-      setCustomName(fileNameWithoutExtension);
-    } else {
-      setCustomName('');
-    }
-  }, [selectedFile]);
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="documentType" className="text-right">
-            Tipo de Documento
-          </Label>
-          <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
-            <SelectTrigger className="col-span-3">
-              <SelectValue placeholder="Seleccionar tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(documentTypeLabels).map((type) => (
-                <SelectItem key={type} value={type}>
-                  {documentTypeLabels[type as DocumentType]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="customName" className="text-right">
-            Nombre del documento
-          </Label>
-          <Input
-            id="customName"
-            value={customName}
-            onChange={(e) => setCustomName(e.target.value)}
-            placeholder="Introduce un nombre personalizado"
-            className="col-span-3"
-          />
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="file" className="text-right">
-            Archivo
-          </Label>
-          <Input
-            id="file"
-            type="file"
-            className="col-span-3"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-          />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancelar
-        </Button>
-        <Button type="submit">Subir</Button>
-      </DialogFooter>
-    </form>
-  );
-};
-
-// Helper function to get a suitable icon based on file type
-const getDocumentIcon = (contentType: string) => {
-  if (contentType.includes('image')) {
-    return <ImageIcon className="h-6 w-6" />;
-  } else if (contentType.includes('pdf')) {
-    return <FileText className="h-6 w-6" />;
-  } else {
-    return <File className="h-6 w-6" />;
-  }
-};
-
-// Check if a file is an image
-const isImage = (contentType: string): boolean => {
-  return contentType.includes('image');
-};
-
-const MemberDocuments: React.FC<{ memberId?: number }> = ({ memberId }) => {
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [currentDocumentUrl, setCurrentDocumentUrl] = useState<string | null>(null);
-  const [documentThumbnail, setDocumentThumbnail] = useState<string | null>(null);
-  const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
-  const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
-  const [thumbnailError, setThumbnailError] = useState(false);
-  const [documentTypes, setDocumentTypes] = useState<any[]>([]);
-  
-  const { toast } = useToast();
-  
-  // Usar nuestro hook personalizado
-  const { documents, loading, error, addDocument, deleteDocument } = useDocuments(memberId ? parseInt(String(memberId)) : undefined);
-  
-  // Obtener los tipos de documentos
-  useEffect(() => {
-    const fetchDocumentTypes = async () => {
+    const loadDocuments = async () => {
       try {
-        const types = await db.documents.toArray();
-        setDocumentTypes(types);
+        setLoading(true);
+        const docs = await db.documents.where('memberId').equals(memberId).toArray();
+        setDocuments(docs);
       } catch (error) {
-        console.error("Error loading document types:", error);
+        console.error('Error loading documents:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudieron cargar los documentos',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
       }
     };
-    
-    fetchDocumentTypes();
-  }, []);
 
-  // Clean up document URL when component unmounts or when URL changes
-  useEffect(() => {
-    return () => {
-      if (currentDocumentUrl) {
-        releaseDocumentUrl(currentDocumentUrl);
-      }
-      if (documentThumbnail && documentThumbnail !== currentDocumentUrl) {
-        releaseDocumentUrl(documentThumbnail);
-      }
-    };
-  }, [currentDocumentUrl, documentThumbnail]);
+    if (memberId) {
+      loadDocuments();
+    }
+  }, [memberId]);
 
-  const createThumbnail = async (doc: Document) => {
+  // Handle file upload
+  const handleFileUpload = async (file: File, documentType: DocumentType, documentName: string) => {
     try {
-      // Reset thumbnail error state
-      setThumbnailError(false);
+      // Create a FileReader to read the file as an ArrayBuffer
+      const reader = new FileReader();
       
-      // For images, use the document itself as the thumbnail
-      if (isImage(doc.contentType)) {
-        return openDocument(doc);
-      }
+      reader.onload = async (event) => {
+        if (!event.target?.result) {
+          throw new Error('Failed to read file');
+        }
+        
+        // Convert the ArrayBuffer to a Buffer for SQLite storage
+        const buffer = Buffer.from(event.target.result as ArrayBuffer);
+        
+        // Create the document object
+        const document: Omit<Document, 'id'> = {
+          memberId,
+          type: documentType,
+          uploadDate: new Date().toISOString(),
+          name: documentName || file.name,
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+          data: buffer,
+          createdAt: new Date().toISOString(),
+        };
+        
+        // Save to database
+        await db.documents.add(document);
+        
+        // Reload documents
+        const updatedDocs = await db.documents.where('memberId').equals(memberId).toArray();
+        setDocuments(updatedDocs);
+        
+        toast({
+          title: 'Éxito',
+          description: 'Documento subido correctamente',
+        });
+        
+        // Close uploader
+        setIsUploaderOpen(false);
+      };
       
-      // For non-images, we'll use a generic icon representation instead
-      return null;
+      reader.onerror = () => {
+        throw new Error('Error reading file');
+      };
+      
+      // Start reading the file
+      reader.readAsArrayBuffer(file);
     } catch (error) {
-      console.error("Error creating thumbnail:", error);
-      setThumbnailError(true);
-      return null;
+      console.error('Error uploading document:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo subir el documento',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleViewDocument = async (doc: Document) => {
-    try {
-      setThumbnailError(false);
-      setCurrentDocument(doc);
-      
-      // Generate URL from document data
-      const url = openDocument(doc);
-      
-      if (!url) {
-        throw new Error("No se pudo generar URL del documento");
-      }
-      
-      setCurrentDocumentUrl(url);
-      
-      // For images, create a thumbnail URL
-      if (isImage(doc.contentType)) {
-        setDocumentThumbnail(url);
-      } else {
-        setDocumentThumbnail(null);
-      }
-      
-      setIsDocumentViewOpen(true);
-    } catch (error) {
-      console.error("Error al abrir el documento:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo abrir el documento."
-      });
-    }
+  // Preparar eliminación de un documento
+  const prepareDeleteDocument = (document: Document) => {
+    setDocumentToDelete(document);
+    setConfirmDeleteOpen(true);
   };
 
-  const handleFileUpload = async (file: File | null, docType: string, customName: string) => {
-    if (!memberId || !file) return;
-
+  // Confirmar eliminación
+  const confirmDeleteDocument = async () => {
     try {
-      // Read the file as an ArrayBuffer
-      const fileData = await file.arrayBuffer();
+      if (!documentToDelete?.id) return;
       
-      // Guardar la referencia en la base de datos usando nuestro hook
-      await addDocument({
-        memberId: parseInt(String(memberId)),
-        type: docType as DocumentType,
-        uploadDate: new Date(),
-        name: customName || file.name, // Use custom name if provided
-        fileName: file.name,
-        contentType: file.type,
-        size: file.size,
-        data: fileData,
-        createdAt: new Date(),
-      });
-
+      await db.documents.delete(documentToDelete.id);
+      
+      // Actualizar la lista de documentos
+      setDocuments(documents.filter(doc => doc.id !== documentToDelete.id));
+      
       toast({
-        title: "Documento subido.",
-        description: "El documento ha sido subido correctamente.",
+        title: 'Éxito',
+        description: 'Documento eliminado correctamente',
       });
     } catch (error) {
-      console.error("Error al subir el documento:", error);
+      console.error('Error deleting document:', error);
       toast({
-        variant: "destructive",
-        title: "Error.",
-        description: "No se pudo subir el documento.",
+        title: 'Error',
+        description: 'No se pudo eliminar el documento',
+        variant: 'destructive',
       });
     } finally {
-      setIsUploadDialogOpen(false);
-    }
-  };
-
-  const handleConfirmDeleteDocument = (documentId?: number) => {
-    if (!documentId) return;
-    setDocumentToDelete(documentId);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleDeleteDocument = async () => {
-    if (!documentToDelete) return;
-
-    try {
-      await deleteDocument(documentToDelete);
-      toast({
-        title: "Documento eliminado.",
-        description: "El documento ha sido eliminado correctamente.",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error.",
-        description: "No se pudo eliminar el documento.",
-      });
-    } finally {
-      setIsDeleteDialogOpen(false);
+      setConfirmDeleteOpen(false);
       setDocumentToDelete(null);
     }
   };
 
+  // Obtener traducción del tipo de documento
+  const getDocumentTypeLabel = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      id: 'DNI/NIE',
+      registration: 'Registro de Socios',
+      membership: 'Acuerdo de Membresía',
+      medical: 'Certificado Médico',
+      consumption: 'Declaración de Consumo',
+      other: 'Otro',
+    };
+    
+    return typeMap[type] || 'Desconocido';
+  };
+
+  // Renderizar icono según tipo de documento
+  const getDocumentIcon = (contentType: string) => {
+    return <FileIcon className="h-10 w-10 text-gray-400" />;
+  };
+
   return (
-    <>
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle>Documentos</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => setIsUploadDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Subir documento
-            </Button>
-          </div>
-          <CardDescription>
-            Documentos asociados al socio
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <p className="text-muted-foreground">Cargando documentos...</p>
-            </div>
-          ) : documents && documents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {documents.map((doc) => (
-                <Card key={doc.id} className="shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-base">
-                      {getDocumentIcon(doc.contentType)}
-                      <span className="ml-2 truncate">{doc.name}</span>
-                    </CardTitle>
-                    <CardDescription>
-                      {documentTypeLabels[doc.type]} • {format(new Date(doc.uploadDate), 'dd/MM/yyyy')}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between">
-                      <Button variant="secondary" size="sm" onClick={() => handleViewDocument(doc)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        Ver
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleConfirmDeleteDocument(doc.id)}>
-                        <Trash className="mr-2 h-4 w-4" />
-                        Eliminar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-32">
-              <ImageIcon className="h-6 w-6 mr-2 text-muted-foreground" />
-              <p className="text-muted-foreground">No hay documentos asociados a este socio.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Documentación</h2>
+        <Button onClick={() => setIsUploaderOpen(true)}>Subir Documento</Button>
+      </div>
 
-      {/* Upload Dialog */}
-      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Subir Documento</DialogTitle>
-          </DialogHeader>
-          <UploadForm 
-            handleFileUpload={handleFileUpload} 
-            documentTypes={documentTypes} 
-            onClose={() => setIsUploadDialogOpen(false)} 
-          />
-        </DialogContent>
-      </Dialog>
+      {loading ? (
+        <div className="text-center py-8">Cargando documentos...</div>
+      ) : documents.length === 0 ? (
+        <div className="text-center py-8 border border-dashed rounded-lg">
+          <p className="text-gray-500">No hay documentos para este miembro</p>
+          <Button variant="outline" className="mt-2" onClick={() => setIsUploaderOpen(true)}>
+            Subir Primer Documento
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {documents.map(doc => (
+            <div key={doc.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors flex justify-between">
+              <div className="flex items-center">
+                <div className="mr-4">
+                  {getDocumentIcon(doc.contentType)}
+                </div>
+                <div>
+                  <h3 className="font-medium">{doc.name}</h3>
+                  <p className="text-sm text-gray-500">
+                    {getDocumentTypeLabel(doc.type)}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {new Date(doc.uploadDate).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col space-y-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => DocumentViewer.openDocument(doc)}
+                >
+                  Ver
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => prepareDeleteDocument(doc)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* View Document Dialog - Making the preview smaller */}
-      <Dialog open={isDocumentViewOpen} onOpenChange={() => {
-        setIsDocumentViewOpen(false);
-        if (currentDocumentUrl) {
-          releaseDocumentUrl(currentDocumentUrl);
-          setCurrentDocumentUrl(null);
-        }
-        if (documentThumbnail) {
-          releaseDocumentUrl(documentThumbnail);
-          setDocumentThumbnail(null);
-        }
-      }}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>{currentDocument?.name || 'Visualización de Documento'}</DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex flex-col space-y-4">
-            {/* Document info */}
-            {currentDocument && (
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="font-medium">Tipo:</span> {documentTypeLabels[currentDocument.type]}
-                </div>
-                <div>
-                  <span className="font-medium">Tamaño:</span> {Math.round(currentDocument.size / 1024)} KB
-                </div>
-                <div>
-                  <span className="font-medium">Fecha:</span> {format(new Date(currentDocument.uploadDate), 'dd/MM/yyyy')}
-                </div>
-                <div>
-                  <span className="font-medium">Archivo original:</span> {currentDocument.fileName}
-                </div>
-              </div>
-            )}
-            
-            {/* Thumbnail preview for images - adjust size to be visible */}
-            {isImage(currentDocument?.contentType || '') && documentThumbnail && (
-              <div className="border rounded-md overflow-hidden w-full max-w-[300px] mx-auto">
-                <AspectRatio ratio={4 / 3} className="bg-muted">
-                  <img 
-                    src={documentThumbnail} 
-                    alt={currentDocument?.name || "Vista previa"}
-                    className="object-contain w-full h-full"
-                    onError={() => setThumbnailError(true)}
-                  />
-                </AspectRatio>
-              </div>
-            )}
-            
-            {/* Non-image document representation */}
-            {!isImage(currentDocument?.contentType || '') && currentDocument && (
-              <div className="border rounded-md p-6 flex items-center justify-center w-full max-w-[300px] mx-auto">
-                <div className="flex flex-col items-center">
-                  {getDocumentIcon(currentDocument.contentType)}
-                  <span className="mt-2 text-sm">{currentDocument.fileName}</span>
-                </div>
-              </div>
-            )}
-            
-            {/* Error state */}
-            {thumbnailError && (
-              <div className="flex items-center justify-center p-4 border rounded-md">
-                <div className="flex flex-col items-center text-destructive">
-                  <FileWarning className="h-10 w-10 mb-2" />
-                  <p>No se pudo cargar la vista previa del documento</p>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter className="mt-4">
-            <Button variant="secondary" onClick={() => {
-              setIsDocumentViewOpen(false);
-              if (currentDocumentUrl) {
-                releaseDocumentUrl(currentDocumentUrl);
-                setCurrentDocumentUrl(null);
-              }
-              if (documentThumbnail) {
-                releaseDocumentUrl(documentThumbnail);
-                setDocumentThumbnail(null);
-              }
-            }}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Uploader Dialog */}
+      {isUploaderOpen && (
+        <DocumentUploader
+          open={isUploaderOpen}
+          onClose={() => setIsUploaderOpen(false)}
+          onUpload={handleFileUpload}
+        />
+      )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Estás seguro?</DialogTitle>
-          </DialogHeader>
-          <p>Esta acción no se puede deshacer. ¿Estás seguro de que quieres eliminar este documento?</p>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setIsDeleteDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteDocument}>
+      {/* Confirm Delete Dialog */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El documento será eliminado permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteDocument} className="bg-red-500 hover:bg-red-600">
               Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 };
 

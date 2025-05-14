@@ -1,397 +1,69 @@
 
-import { useState, useEffect, useRef } from 'react';
-import { db, Document } from '@/lib/db';
-import { DocumentType } from '@/lib/document-types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload, Download, FileImage, Maximize } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter
-} from '@/components/ui/dialog';
+import React, { useEffect, useState } from 'react';
+import { Document } from '@/lib/document-types';
+import { db } from '@/lib/db';
+import { DocumentViewer } from '@/lib/document-viewer';
 
-interface DocumentsSectionProps {
+interface Props {
   memberId: number;
 }
 
-const DocumentsSection: React.FC<DocumentsSectionProps> = ({ memberId }) => {
+const DocumentsSection: React.FC<Props> = ({ memberId }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
-  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
-  const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        if (memberId) {
+          const docs = await db.documents.where('memberId').equals(memberId).toArray();
+          setDocuments(docs);
+        }
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchDocuments();
   }, [memberId]);
 
-  const fetchDocuments = async () => {
-    try {
-      const memberDocuments = await db.documents
-        .where('memberId')
-        .equals(memberId)
-        .toArray();
-      setDocuments(memberDocuments);
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudieron cargar los documentos'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (loading) {
+    return <div className="text-center py-4">Cargando documentos...</div>;
+  }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-      // Automatically set document name if not provided
-      if (!newDocumentName) {
-        setNewDocumentName(e.target.files[0].name);
-      }
-    }
-  };
-
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedFile) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Por favor selecciona un archivo'
-      });
-      return;
-    }
-
-    if (!newDocumentName) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Por favor ingresa un nombre para el documento'
-      });
-      return;
-    }
-
-    setIsUploading(true);
-
-    try {
-      // Convert file to base64
-      const base64 = await fileToBase64(selectedFile);
-      
-      // Add document to database
-      const docId = await db.documents.add({
-        memberId,
-        name: newDocumentName,
-        type: 'other' as DocumentType,
-        fileName: selectedFile.name,
-        contentType: selectedFile.type,
-        size: selectedFile.size,
-        data: base64,
-        uploadDate: new Date(),
-        createdAt: new Date()
-      });
-
-      // Refresh documents list
-      const newDoc = await db.documents.get(docId);
-      if (newDoc) {
-        setDocuments([...documents, newDoc]);
-      }
-
-      // Reset form
-      setSelectedFile(null);
-      setNewDocumentName('');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-
-      toast({
-        title: 'Documento subido',
-        description: 'El documento ha sido subido correctamente'
-      });
-    } catch (error) {
-      console.error('Error uploading document:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudo subir el documento'
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  const handleDownload = (doc: Document) => {
-    try {
-      const link = doc.data;
-      const a = window.document.createElement('a');
-      a.href = link.toString();
-      a.download = doc.fileName;
-      window.document.body.appendChild(a);
-      a.click();
-      window.document.body.removeChild(a);
-      toast({
-        title: 'Descarga iniciada',
-        description: 'El documento se está descargando'
-      });
-    } catch (error) {
-      console.error('Error downloading document:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudo descargar el documento'
-      });
-    }
-  };
-
-  // Function to determine if a document can show a thumbnail
-  const canShowThumbnail = (doc: Document): boolean => {
-    return doc.contentType?.startsWith('image/') || false;
-  };
-
-  // Function to get thumbnail from document data
-  const getThumbnailUrl = (doc: Document): string => {
-    if (canShowThumbnail(doc)) {
-      return doc.data?.toString() || '';
-    }
-    return '';
-  };
-
-  const confirmDelete = (id: number) => {
-    setDocumentToDelete(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDelete = async () => {
-    if (!documentToDelete) return;
-    
-    try {
-      await db.documents.delete(documentToDelete);
-      setDocuments(documents.filter(doc => doc.id !== documentToDelete));
-      toast({
-        title: 'Documento eliminado',
-        description: 'El documento ha sido eliminado correctamente'
-      });
-    } catch (error) {
-      console.error('Error deleting document:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudo eliminar el documento'
-      });
-    } finally {
-      setDeleteDialogOpen(false);
-      setDocumentToDelete(null);
-    }
-  };
-
-  const openPreview = (doc: Document) => {
-    if (canShowThumbnail(doc)) {
-      setPreviewDocument(doc);
-      setPreviewDialogOpen(true);
-    }
-  };
+  if (documents.length === 0) {
+    return <div className="text-center py-4 text-gray-500">No hay documentos</div>;
+  }
 
   return (
-    <Card className="border-green-200">
-      <CardHeader>
-        <CardTitle>Documentos</CardTitle>
-        <CardDescription>
-          Gestiona los documentos asociados a este socio
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <form onSubmit={handleUpload} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="documentName">Nombre del documento</Label>
-              <Input
-                id="documentName"
-                value={newDocumentName}
-                onChange={(e) => setNewDocumentName(e.target.value)}
-                className="border-green-200 focus-visible:ring-green-500"
-                placeholder="Ej. DNI, Certificado..."
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="documentFile">Archivo</Label>
-              <Input
-                id="documentFile"
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileChange}
-                className="border-green-200 focus-visible:ring-green-500"
-                required
-              />
-            </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+      {documents.map((doc) => (
+        <div
+          key={doc.id}
+          className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <h3 className="font-medium text-lg truncate">{doc.name}</h3>
+          <p className="text-sm text-gray-500 mb-2">
+            {new Date(doc.uploadDate).toLocaleDateString()}
+          </p>
+          
+          <div className="mt-2 flex justify-between items-center">
+            <span className="text-xs px-2 py-1 bg-gray-100 rounded">
+              {doc.contentType}
+            </span>
+            
+            <button
+              onClick={() => DocumentViewer.openDocument(doc)}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            >
+              Ver documento
+            </button>
           </div>
-          <Button 
-            type="submit" 
-            disabled={isUploading}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {isUploading ? (
-              <div className="flex items-center">
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-t-2 border-white"></div>
-                Subiendo...
-              </div>
-            ) : (
-              <>
-                <Upload className="mr-2 h-4 w-4" />
-                Subir documento
-              </>
-            )}
-          </Button>
-        </form>
-
-        <div className="space-y-2">
-          <h3 className="font-medium">Documentos subidos</h3>
-          {isLoading ? (
-            <div className="flex h-20 items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
-            </div>
-          ) : documents.length > 0 ? (
-            <div className="rounded-md border">
-              <div className="divide-y">
-                {documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between p-3">
-                    <div className="flex items-center space-x-3">
-                      {canShowThumbnail(doc) ? (
-                        <div 
-                          className="h-12 w-12 rounded border overflow-hidden flex-shrink-0 cursor-pointer"
-                          onClick={() => openPreview(doc)}
-                        >
-                          <img 
-                            src={getThumbnailUrl(doc)} 
-                            alt={doc.name}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-12 w-12 rounded border bg-muted flex items-center justify-center flex-shrink-0">
-                          <FileImage className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium">{doc.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(doc.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      {canShowThumbnail(doc) && (
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          onClick={() => openPreview(doc)}
-                          title="Ver imagen"
-                        >
-                          <Maximize className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        onClick={() => handleDownload(doc)}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        size="icon"
-                        onClick={() => confirmDelete(doc.id!)}
-                        className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="py-3 text-center text-muted-foreground">
-              No hay documentos subidos
-            </p>
-          )}
         </div>
-      </CardContent>
-
-      {/* Delete confirmation dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar eliminación</DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de que quieres eliminar este documento? Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Image preview modal */}
-      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{previewDocument?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="flex justify-center">
-            {previewDocument && (
-              <img 
-                src={getThumbnailUrl(previewDocument)} 
-                alt={previewDocument.name}
-                className="max-h-[70vh] max-w-full object-contain"
-              />
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>
-              Cerrar
-            </Button>
-            {previewDocument && (
-              <Button onClick={() => handleDownload(previewDocument)}>
-                <Download className="mr-2 h-4 w-4" />
-                Descargar
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
+      ))}
+    </div>
   );
 };
 
