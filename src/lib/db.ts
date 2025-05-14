@@ -114,6 +114,7 @@ class ClubDatabase extends Dexie {
   memberTransactions!: Table<MemberTransaction>;
 
   constructor() {
+    // Usamos './data/club-database' para que se guarde en una carpeta 'data' en el directorio del proyecto
     super("ClubDatabase");
     
     this.version(1).stores({
@@ -163,11 +164,164 @@ class ClubDatabase extends Dexie {
     return `${year}${month}-${firstInitial}${lastInitial}${sequentialNumber}`;
   }
 
-  // Method to export database as SQLite (stub for type checking)
-  async exportAsSQLite(): Promise<Blob> {
-    // This would be implemented with actual functionality
-    console.log("Exporting database as SQLite...");
-    return new Blob(['SQLite export data would go here'], { type: 'application/x-sqlite3' });
+  // Método para exportar la base de datos como un archivo SQLite
+  async exportToFile(): Promise<string> {
+    try {
+      // Collect all data from the database
+      const members = await this.members.toArray();
+      const users = await this.users.toArray();
+      const documents = await this.documents.toArray();
+      const products = await this.products.toArray();
+      const dispensary = await this.dispensary.toArray();
+      const cashRegisters = await this.cashRegisters.toArray();
+      const cashTransactions = await this.cashTransactions.toArray();
+      const memberTransactions = await this.memberTransactions.toArray();
+      
+      // Create the export object
+      const exportData = {
+        members,
+        users,
+        documents,
+        products,
+        dispensary,
+        cashRegisters,
+        cashTransactions,
+        memberTransactions,
+        exportDate: new Date(),
+        version: '1.0'
+      };
+      
+      // Convertir a JSON y guardar en localStorage para fácil acceso
+      const jsonString = JSON.stringify(exportData);
+      localStorage.setItem('club-database-export', jsonString);
+      
+      return jsonString;
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      throw new Error('Error al exportar los datos de la base de datos');
+    }
+  }
+
+  // Método para importar datos desde un archivo JSON
+  async importFromJson(jsonData: string): Promise<void> {
+    try {
+      const importData = JSON.parse(jsonData);
+      
+      // Validate the import data
+      if (!importData.members || !importData.users) {
+        throw new Error('Formato de archivo inválido');
+      }
+      
+      // Clear existing data
+      await this.members.clear();
+      await this.users.clear();
+      
+      // Clear other tables if they exist in import data
+      if (importData.documents) await this.documents.clear();
+      if (importData.products) await this.products.clear();
+      if (importData.dispensary) await this.dispensary.clear();
+      if (importData.cashRegisters) await this.cashRegisters.clear();
+      if (importData.cashTransactions) await this.cashTransactions.clear();
+      if (importData.memberTransactions) await this.memberTransactions.clear();
+      
+      // Import all data
+      await this.transaction('rw', 
+        this.members, 
+        this.users, 
+        this.documents, 
+        this.products, 
+        this.dispensary, 
+        this.cashRegisters, 
+        this.cashTransactions, 
+        this.memberTransactions, 
+        async () => {
+          
+        // Import members
+        for (const member of importData.members) {
+          await this.members.add({
+            ...member,
+            createdAt: new Date(member.createdAt),
+            updatedAt: new Date(member.updatedAt),
+            dob: new Date(member.dob),
+            joinDate: new Date(member.joinDate)
+          });
+        }
+        
+        // Import users
+        for (const user of importData.users) {
+          await this.users.add({
+            ...user,
+            createdAt: new Date(user.createdAt),
+            lastLogin: user.lastLogin ? new Date(user.lastLogin) : undefined
+          });
+        }
+        
+        // Import other data
+        if (importData.documents) {
+          for (const document of importData.documents) {
+            await this.documents.add({
+              ...document,
+              uploadDate: new Date(document.uploadDate),
+              createdAt: new Date(document.createdAt)
+            });
+          }
+        }
+        
+        if (importData.products) {
+          for (const product of importData.products) {
+            await this.products.add({
+              ...product,
+              createdAt: new Date(product.createdAt),
+              updatedAt: new Date(product.updatedAt)
+            });
+          }
+        }
+        
+        if (importData.dispensary) {
+          for (const item of importData.dispensary) {
+            await this.dispensary.add({
+              ...item,
+              createdAt: new Date(item.createdAt)
+            });
+          }
+        }
+        
+        if (importData.cashRegisters) {
+          for (const register of importData.cashRegisters) {
+            await this.cashRegisters.add({
+              ...register,
+              openDate: new Date(register.openDate),
+              closeDate: register.closeDate ? new Date(register.closeDate) : undefined,
+              openedAt: new Date(register.openedAt),
+              closedAt: register.closedAt ? new Date(register.closedAt) : undefined
+            });
+          }
+        }
+        
+        if (importData.cashTransactions) {
+          for (const transaction of importData.cashTransactions) {
+            await this.cashTransactions.add({
+              ...transaction,
+              createdAt: new Date(transaction.createdAt)
+            });
+          }
+        }
+        
+        if (importData.memberTransactions) {
+          for (const transaction of importData.memberTransactions) {
+            await this.memberTransactions.add({
+              ...transaction,
+              createdAt: new Date(transaction.createdAt)
+            });
+          }
+        }
+      });
+      
+      console.log('Database import completed successfully');
+    } catch (error) {
+      console.error('Error importing data:', error);
+      throw new Error('Error al importar los datos');
+    }
   }
 }
 

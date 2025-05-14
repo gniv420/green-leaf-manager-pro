@@ -1,399 +1,118 @@
+
 # Cannabis Club Manager
 
-Aplicación para la gestión integral de clubes de cannabis, incluyendo gestión de socios, dispensario, inventario y caja.
+Aplicación para gestión de asociaciones cannábicas.
 
-## Características principales
+## Requisitos
 
-- Gestión completa de socios
-- Sistema de dispensario
-- Control de inventario
-- Gestión de caja
-- Informes y estadísticas
-- Modo oscuro
-- Diseño responsive
-- Gestión de documentos
-- Soporte para SQLite3 en Raspberry Pi
+- Node.js 16.x o superior
+- npm o yarn
 
-## Tecnologías utilizadas
+## Instalación en Raspberry Pi
 
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- shadcn/ui
-- IndexedDB (Dexie.js) para desarrollo
-- SQLite3 para producción en Raspberry Pi
-
-## Configuración del entorno
-
-### Versión de desarrollo (local)
+### 1. Clonar el repositorio
 
 ```bash
-# Clonar el repositorio
 git clone https://github.com/tu-usuario/cannabis-club-manager.git
-
-# Entrar al directorio
 cd cannabis-club-manager
+```
 
-# Instalar dependencias
+### 2. Instalar dependencias
+
+```bash
 npm install
+```
 
-# Iniciar en modo desarrollo
-npm run dev
+### 3. Construir la aplicación
 
-# Compilar para producción
+```bash
 npm run build
 ```
 
-### Configuración en Raspberry Pi 3B+
+### 4. Instalar dependencias adicionales para el servidor
 
-#### Acceso al sistema
-
-- IP: 192.168.1.173
-- DNS: gniv.zapto.org
-- Usuario SSH: gniv
-- Puerto: 22
-
-#### Preparación del sistema Raspberry Pi
-
-1. Instalar Raspberry Pi OS Lite (64-bit) para mejor rendimiento:
-   ```bash
-   # Descargar e instalar Raspberry Pi Imager desde:
-   # https://www.raspberrypi.org/software/
-   
-   # Seleccionar "Raspberry Pi OS Lite (64-bit)" al configurar la tarjeta SD
-   ```
-
-2. Configuración inicial después del primer arranque:
-   ```bash
-   # Actualizar el sistema
-   sudo apt update
-   sudo apt upgrade -y
-   
-   # Instalar dependencias necesarias
-   sudo apt install -y git curl sqlite3 nginx
-   
-   # Instalar Node.js 18.x (versión LTS)
-   curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-   sudo apt install -y nodejs
-   
-   # Verificar instalación
-   node -v  # Debería mostrar v18.x.x
-   npm -v   # Debería mostrar 9.x.x
-   ```
-
-3. Optimización de rendimiento:
-   ```bash
-   # Aumentar el tamaño del archivo swap para evitar problemas de memoria
-   sudo dphys-swapfile swapoff
-   sudo nano /etc/dphys-swapfile
-   
-   # Cambiar CONF_SWAPSIZE=100 a CONF_SWAPSIZE=1024
-   
-   sudo dphys-swapfile setup
-   sudo dphys-swapfile swapon
-   
-   # Verificar el nuevo tamaño del swap
-   free -h
-   ```
-
-#### Instalación y configuración de la base de datos SQLite3
-
-1. Crear el directorio para la base de datos:
-   ```bash
-   sudo mkdir -p /opt/club-manager/db
-   sudo chown gniv:gniv /opt/club-manager/db
-   ```
-
-2. Crear el archivo de configuración inicial de la base de datos:
-   ```bash
-   # Crear el archivo setup.sql
-   cat > setup.sql << EOL
-   -- Cannabis Club Manager Database Setup
-   
-   -- Create tables
-   CREATE TABLE IF NOT EXISTS users (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     username TEXT NOT NULL,
-     password TEXT NOT NULL,
-     fullName TEXT NOT NULL,
-     isAdmin INTEGER NOT NULL,
-     createdAt TEXT NOT NULL,
-     lastLogin TEXT
-   );
-   
-   CREATE TABLE IF NOT EXISTS members (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     memberCode TEXT NOT NULL,
-     firstName TEXT NOT NULL,
-     lastName TEXT NOT NULL,
-     dni TEXT NOT NULL,
-     email TEXT,
-     phone TEXT NOT NULL,
-     dob TEXT NOT NULL,
-     address TEXT,
-     city TEXT,
-     postalCode TEXT,
-     joinDate TEXT NOT NULL,
-     consumptionGrams REAL NOT NULL,
-     notes TEXT,
-     status TEXT NOT NULL,
-     balance REAL,
-     sponsorId INTEGER,
-     rfidCode TEXT,
-     createdAt TEXT NOT NULL,
-     updatedAt TEXT NOT NULL
-   );
-   
-   CREATE TABLE IF NOT EXISTS products (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     name TEXT NOT NULL,
-     description TEXT,
-     category TEXT NOT NULL,
-     type TEXT NOT NULL,
-     price REAL NOT NULL,
-     costPrice REAL,
-     stockGrams REAL NOT NULL,
-     isVisible INTEGER,
-     image TEXT,
-     notes TEXT,
-     createdAt TEXT NOT NULL,
-     updatedAt TEXT NOT NULL
-   );
-   
-   CREATE TABLE IF NOT EXISTS dispensary (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     memberId INTEGER NOT NULL,
-     productId INTEGER NOT NULL,
-     quantity REAL NOT NULL,
-     price REAL NOT NULL,
-     paymentMethod TEXT NOT NULL,
-     notes TEXT,
-     userId INTEGER NOT NULL,
-     createdAt TEXT NOT NULL
-   );
-   
-   CREATE TABLE IF NOT EXISTS cash_registers (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     openDate TEXT NOT NULL,
-     closeDate TEXT,
-     initialBalance REAL NOT NULL,
-     finalBalance REAL,
-     status TEXT NOT NULL,
-     openingAmount REAL NOT NULL,
-     closingAmount REAL,
-     userId INTEGER NOT NULL,
-     notes TEXT,
-     openedAt TEXT NOT NULL,
-     closedAt TEXT
-   );
-   
-   CREATE TABLE IF NOT EXISTS cash_transactions (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     cashRegisterId INTEGER NOT NULL,
-     type TEXT NOT NULL,
-     amount REAL NOT NULL,
-     concept TEXT NOT NULL,
-     notes TEXT,
-     userId INTEGER NOT NULL,
-     paymentMethod TEXT NOT NULL,
-     createdAt TEXT NOT NULL
-   );
-   
-   CREATE TABLE IF NOT EXISTS member_transactions (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     memberId INTEGER NOT NULL,
-     amount REAL NOT NULL,
-     type TEXT NOT NULL,
-     notes TEXT,
-     userId INTEGER NOT NULL,
-     createdAt TEXT NOT NULL
-   );
-   
-   CREATE TABLE IF NOT EXISTS documents (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     memberId INTEGER NOT NULL,
-     type TEXT NOT NULL,
-     uploadDate TEXT NOT NULL,
-     name TEXT NOT NULL,
-     fileName TEXT NOT NULL,
-     contentType TEXT NOT NULL,
-     size INTEGER NOT NULL,
-     filePath TEXT NOT NULL,
-     createdAt TEXT NOT NULL
-   );
-   
-   -- Insert initial admin user
-   INSERT INTO users (username, password, fullName, isAdmin, createdAt)
-   VALUES ('admin', '1234', 'Administrator', 1, datetime('now'));
-   EOL
-   ```
-
-3. Inicializar la base de datos:
-   ```bash
-   # Crear la base de datos SQLite
-   sqlite3 /opt/club-manager/db/club.db < setup.sql
-   
-   # Asignar permisos adecuados
-   sudo chown gniv:gniv /opt/club-manager/db/club.db
-   sudo chmod 664 /opt/club-manager/db/club.db
-   ```
-
-#### Instalación de la aplicación
-
-1. Clonar el repositorio y configurar:
-   ```bash
-   mkdir -p ~/apps
-   cd ~/apps
-   git clone https://github.com/tu-usuario/cannabis-club-manager.git
-   cd cannabis-club-manager
-   
-   # Para Raspberry Pi es recomendable usar --legacy-peer-deps para evitar problemas
-   npm install --legacy-peer-deps
-   ```
-
-2. Configurar la aplicación:
-   ```bash
-   # Crear archivo de configuración para el backend
-   cat > .env << EOL
-   DB_PATH=/opt/club-manager/db/club.db
-   PORT=3000
-   HOST=0.0.0.0
-   EOL
-   ```
-
-3. Compilar la aplicación para producción:
-   ```bash
-   # Aumentar el timeout del node para evitar problemas durante la compilación
-   NODE_OPTIONS=--max_old_space_size=800 npm run build
-   
-   # Instalar PM2 para gestionar el servicio
-   sudo npm install -g pm2
-   
-   # Iniciar el backend
-   pm2 start server.js --name "club-backend"
-   
-   # Configurar para que se inicie automáticamente
-   pm2 save
-   pm2 startup
-   # (ejecutar el comando que te muestra PM2)
-   ```
-
-4. Configurar Nginx como proxy inverso:
-   ```bash
-   sudo nano /etc/nginx/sites-available/club-manager
-   ```
-   
-   Añadir la siguiente configuración:
-   ```
-   server {
-       listen 80;
-       server_name gniv.zapto.org;
-   
-       root /home/gniv/apps/cannabis-club-manager/dist;
-       index index.html;
-   
-       location / {
-           try_files $uri $uri/ /index.html;
-       }
-   
-       location /api {
-           proxy_pass http://localhost:3000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection 'upgrade';
-           proxy_set_header Host $host;
-           proxy_cache_bypass $http_upgrade;
-       }
-   }
-   ```
-   
-   Activar el sitio:
-   ```bash
-   sudo ln -s /etc/nginx/sites-available/club-manager /etc/nginx/sites-enabled/
-   sudo nginx -t
-   sudo systemctl restart nginx
-   ```
-
-5. Configurar acceso remoto seguro:
-   ```bash
-   # Habilitar SSH si no está habilitado
-   sudo raspi-config
-   # Navegar a "Interface Options" > "SSH" > "Yes"
-
-   # Opcional: Configurar autenticación por clave
-   mkdir -p ~/.ssh
-   chmod 700 ~/.ssh
-   # Añadir clave pública al archivo authorized_keys
-   ```
-
-#### Migración de datos desde la versión local
-
-1. En la aplicación local:
-   - Ve a "Configuración" > "Exportar datos (SQLite)"
-   - Guarda el archivo SQL generado
-
-2. Transferir el archivo a la Raspberry Pi:
-   ```bash
-   scp club-export.sql gniv@192.168.1.173:/tmp/
-   ```
-   
-3. Importar datos en la Raspberry Pi:
-   ```bash
-   sqlite3 /opt/club-manager/db/club.db < /tmp/club-export.sql
-   ```
-
-#### Actualizaciones y mantenimiento
-
-Para actualizar la aplicación:
 ```bash
-cd ~/apps/cannabis-club-manager
-git pull
-npm install --legacy-peer-deps
-NODE_OPTIONS=--max_old_space_size=800 npm run build
-pm2 restart club-backend
+npm install express sqlite3 cors dotenv
 ```
 
-Para realizar copias de seguridad de la base de datos:
-```bash
-# Crear copia de seguridad
-sqlite3 /opt/club-manager/db/club.db .dump > /opt/club-manager/db/backup-$(date +%Y%m%d).sql
+### 5. Crear archivo .env
 
-# Restaurar copia de seguridad
-sqlite3 /opt/club-manager/db/club.db < /opt/club-manager/db/backup-YYYYMMDD.sql
+Crea un archivo `.env` en la raíz del proyecto con el siguiente contenido:
+
+```
+PORT=3000
+HOST=localhost
+DB_PATH=./data/club.db
 ```
 
-## Solución de problemas comunes
+Puedes ajustar estas configuraciones según tus necesidades.
 
-### Problemas de memoria
+### 6. Configurar el servidor para iniciar con PM2
+
 ```bash
-# Ver uso de memoria
-free -h
-
-# Reiniciar el servicio si hay problemas
-pm2 restart club-backend
+npm install -g pm2
+pm2 start server.js --name "cannabis-club-manager"
+pm2 save
+pm2 startup
 ```
 
-### Problemas de base de datos
-```bash
-# Verificar integridad de la base de datos
-sqlite3 /opt/club-manager/db/club.db "PRAGMA integrity_check;"
+Sigue las instrucciones que te dará el comando `pm2 startup` para configurar el inicio automático.
 
-# Optimizar base de datos
-sqlite3 /opt/club-manager/db/club.db "VACUUM;"
+### 7. Acceder a la aplicación
+
+La aplicación estará disponible en:
+
+```
+http://localhost:3000
 ```
 
-### Logs y monitorización
-```bash
-# Ver logs de la aplicación
-pm2 logs club-backend
+Si deseas acceder desde otros dispositivos en tu red local, usa la IP de la Raspberry Pi en lugar de localhost.
 
-# Ver logs del servidor web
-sudo tail -f /var/log/nginx/error.log
+## Compartir la carpeta con Samba
+
+Para acceder a los archivos desde Windows o MacOS, puedes configurar Samba:
+
+1. Instalar Samba:
+```bash
+sudo apt update
+sudo apt install samba samba-common-bin
 ```
 
-## Contacto y soporte
+2. Configurar Samba:
+```bash
+sudo nano /etc/samba/smb.conf
+```
 
-Para preguntas o soporte técnico, contacta a través de:
-- Email: soporte@tudominio.com
-- Telegram: @TuUsuario
+3. Añade al final del archivo:
+```
+[cannabis-club-manager]
+   path = /ruta/a/cannabis-club-manager
+   browseable = yes
+   writeable = yes
+   create mask = 0775
+   directory mask = 0775
+   public = no
+   valid users = tu-usuario
+```
+
+4. Crear una contraseña para el usuario:
+```bash
+sudo smbpasswd -a tu-usuario
+```
+
+5. Reiniciar Samba:
+```bash
+sudo systemctl restart smbd
+```
+
+## Backups
+
+Los datos se guardan en `./data/club.db`. Es recomendable hacer backups periódicos de este archivo.
+
+## Acceso
+
+El usuario y contraseña por defecto son:
+- Usuario: admin
+- Contraseña: 1234
+
+**¡Importante!** Cambia esta contraseña después de tu primer inicio de sesión por seguridad.
