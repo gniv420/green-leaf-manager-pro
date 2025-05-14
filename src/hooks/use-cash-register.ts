@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { CashRegister } from '@/lib/sqlite-db';
-import { db } from '@/lib/sqlite-db';
+import { CashRegister, db } from '@/lib/db';
 
 export function useCurrentCashRegister() {
   const [cashRegister, setCashRegister] = useState<CashRegister | null>(null);
