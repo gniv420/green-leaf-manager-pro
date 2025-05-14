@@ -1,3 +1,4 @@
+
 // Tipos de datos equivalentes a los que teníamos en Dexie
 export interface User {
   id?: number;
@@ -113,9 +114,149 @@ export interface Document {
 // Import SQLite database implementation
 import { db as sqliteDb } from './sqlite-db';
 
-// Export the database interface
+// Export the database interface with its collection-like API to mimic Dexie
 export class ClubDatabase {
-  // Forward SQLite methods for cash register operations
+  // Mimic the Dexie collection structure for backward compatibility
+  users = {
+    get: async (id: number) => await sqliteDb.getUserById(id),
+    where: (field: string) => ({
+      equals: async (value: any) => {
+        if (field === 'username') {
+          const user = await sqliteDb.getUserByUsername(value);
+          return {
+            first: async () => user
+          };
+        }
+        return { first: async () => null };
+      }
+    }),
+    toArray: async () => await sqliteDb.getUsers(),
+    add: async (user: any) => await sqliteDb.addUser(user),
+    update: async (id: number, user: any) => await sqliteDb.updateUser(id, user),
+    delete: async (id: number) => await sqliteDb.deleteUser(id)
+  };
+
+  members = {
+    get: async (id: number) => await sqliteDb.getMemberById(id),
+    where: (field: string) => ({
+      equals: async (value: any) => {
+        if (field === 'rfidCode') {
+          const member = await sqliteDb.getMemberByRfid(value);
+          return {
+            first: async () => member
+          };
+        }
+        return { first: async () => null };
+      }
+    }),
+    toArray: async () => await sqliteDb.getMembers(),
+    add: async (member: any) => await sqliteDb.addMember(member),
+    update: async (id: number, member: any) => await sqliteDb.updateMember(id, member),
+    delete: async (id: number) => await sqliteDb.deleteMember(id)
+  };
+
+  products = {
+    toArray: async () => await sqliteDb.getProducts(),
+    get: async (id: number) => await sqliteDb.getProductById(id),
+    add: async (product: any) => await sqliteDb.addProduct(product),
+    update: async (id: number, product: any) => await sqliteDb.updateProduct(id, product),
+    delete: async (id: number) => await sqliteDb.deleteProduct(id),
+    where: (field: string) => ({
+      equals: async (value: any) => {
+        if (field === 'isVisible') {
+          const products = value ? await sqliteDb.getVisibleProducts() : [];
+          return {
+            toArray: async () => products
+          };
+        }
+        return { toArray: async () => [] };
+      }
+    }),
+  };
+
+  dispensary = {
+    toArray: async () => await sqliteDb.getDispensaryRecords(),
+    where: (field: string) => ({
+      equals: async (value: any) => {
+        if (field === 'memberId') {
+          const records = await sqliteDb.getDispensaryForMember(value);
+          return {
+            toArray: async () => records
+          };
+        }
+        return { toArray: async () => [] };
+      }
+    }),
+    add: async (record: any) => await sqliteDb.addDispensaryRecord(record),
+    delete: async (id: number) => await sqliteDb.deleteDispensary(id)
+  };
+
+  documents = {
+    where: (field: string) => ({
+      equals: async (value: any) => {
+        if (field === 'memberId') {
+          const docs = await sqliteDb.getDocuments(value);
+          return {
+            toArray: async () => docs
+          };
+        }
+        return { toArray: async () => [] };
+      }
+    }),
+    add: async (document: any) => await sqliteDb.addDocument(document),
+    get: async (id: number) => await sqliteDb.getDocumentById(id),
+    delete: async (id: number) => await sqliteDb.deleteDocument(id)
+  };
+
+  memberTransactions = {
+    where: (field: string) => ({
+      equals: async (value: any) => {
+        if (field === 'memberId') {
+          const transactions = await sqliteDb.getMemberTransactions(value);
+          return {
+            toArray: async () => transactions,
+            reverse: () => ({
+              sortBy: async (sortField: string) => transactions.sort((a, b) => {
+                if (sortField === 'createdAt') {
+                  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                }
+                return 0;
+              })
+            })
+          };
+        }
+        return { 
+          toArray: async () => [],
+          reverse: () => ({
+            sortBy: async () => []
+          })
+        };
+      }
+    }),
+    add: async (transaction: any) => await sqliteDb.addMemberTransaction(transaction)
+  };
+
+  cashTransactions = {
+    where: (field: string) => ({
+      equals: async (value: any) => {
+        if (field === 'cashRegisterId') {
+          const transactions = await sqliteDb.getCashTransactions(value);
+          return {
+            toArray: async () => transactions
+          };
+        }
+        return { toArray: async () => [] };
+      }
+    }),
+    add: async (transaction: any) => await sqliteDb.addCashTransaction(transaction)
+  };
+
+  // Method to generate member codes
+  async generateMemberCode(firstName: string, lastName: string): Promise<string> {
+    return await sqliteDb.generateMemberCode(firstName, lastName);
+  }
+
+  // Direct methods from SQLite database
   async getOpenCashRegister() {
     return await sqliteDb.getOpenCashRegister();
   }
@@ -140,7 +281,6 @@ export class ClubDatabase {
     return await sqliteDb.addCashTransaction(transaction);
   }
 
-  // Add other methods needed by the application
   async getUsers() {
     return await sqliteDb.getUsers();
   }
@@ -269,5 +409,5 @@ export class ClubDatabase {
 // Create and export a singleton instance
 export const db = new ClubDatabase();
 
-// Re-export SQLite types for convenience
-export type { CashRegister, CashTransaction } from './sqlite-db';
+// Export type only, not the conflicting interface
+export type { CashRegister as CashRegisterType, CashTransaction as CashTransactionType } from './sqlite-db';

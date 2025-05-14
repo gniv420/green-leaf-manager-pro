@@ -1,36 +1,30 @@
 
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import path from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [
-    react(),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
+export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
-  // Exclude Node.js built-in modules from being bundled
-  optimizeDeps: {
-    exclude: ['sqlite3', 'sqlite']
+  server: {
+    port: 3000,
   },
-  // Allow Node.js modules to be externalized
   build: {
-    commonjsOptions: {
-      esmExternals: true,
-    },
     rollupOptions: {
-      external: ['sqlite3', 'sqlite', 'fs', 'path']
+      // Externalize dependencies that shouldn't be bundled into your library
+      external: [
+        'fs',
+        'path',
+        'events',
+        'util',
+        'sqlite3',
+        'sqlite'
+      ]
     }
   }
-}));
+});

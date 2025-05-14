@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { db } from '@/lib/db';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import {
   Card,
@@ -68,8 +69,8 @@ const formSchema = z.object({
   phone: z.string().min(9, {
     message: "El teléfono debe tener al menos 9 caracteres.",
   }),
-  dob: z.date(),
-  joinDate: z.date(),
+  dob: z.string(), // Updated to accept string
+  joinDate: z.string(), // Updated to accept string
   consumptionGrams: z.number(),
   notes: z.string().optional(),
   status: z.enum(['active', 'inactive', 'pending']),
@@ -204,8 +205,8 @@ const MemberDetails = () => {
       lastName: '',
       dni: '',
       phone: '',
-      dob: new Date(),
-      joinDate: new Date(),
+      dob: '', // Set as empty string
+      joinDate: '', // Set as empty string
       consumptionGrams: 0,
       notes: '',
       status: 'active',
@@ -221,8 +222,8 @@ const MemberDetails = () => {
         lastName: member.lastName,
         dni: member.dni,
         phone: member.phone,
-        dob: member.dob,
-        joinDate: member.joinDate,
+        dob: member.dob, // String date from database
+        joinDate: member.joinDate, // String date from database
         consumptionGrams: member.consumptionGrams,
         notes: member.notes || '',
         status: member.status,
@@ -240,13 +241,13 @@ const MemberDetails = () => {
         lastName: data.lastName,
         dni: data.dni,
         phone: data.phone,
-        dob: data.dob,
-        joinDate: data.joinDate,
+        dob: data.dob, // Pass string directly
+        joinDate: data.joinDate, // Pass string directly
         consumptionGrams: data.consumptionGrams,
         notes: data.notes,
         status: data.status,
         rfidCode: data.rfidCode,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       });
 
       toast({
