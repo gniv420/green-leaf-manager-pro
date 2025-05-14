@@ -21,7 +21,6 @@ import Users from "@/pages/Users";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 
-// Ya no se necesita inicializar Dexie
 import './App.css';
 
 function App() {

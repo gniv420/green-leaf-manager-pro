@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '@/lib/db';
@@ -5,16 +6,17 @@ import { toast } from '@/hooks/use-toast';
 import { User } from '@/lib/db';
 
 interface AuthContextType {
-  user: User | null;
+  currentUser: User | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  isLoading: boolean; // Add isLoading property
+  isLoading: boolean;
+  isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   
@@ -26,7 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (savedUserId) {
           const user = await db.getUserById(Number(savedUserId));
           if (user) {
-            setUser(user);
+            setCurrentUser(user);
           } else {
             // If user not found, clear localStorage
             localStorage.removeItem('userId');
@@ -55,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Update user data with last login time
         const updatedUser = { ...user, lastLogin: new Date().toISOString() };
-        setUser(updatedUser);
+        setCurrentUser(updatedUser);
         
         // Store user ID in localStorage
         localStorage.setItem('userId', String(user.id));
@@ -81,16 +83,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   const logout = () => {
-    setUser(null);
+    setCurrentUser(null);
     localStorage.removeItem('userId');
     navigate('/login');
   };
   
   const value = {
-    user,
+    currentUser,
     login,
     logout,
-    isLoading
+    isLoading,
+    isAuthenticated: !!currentUser
   };
   
   return (

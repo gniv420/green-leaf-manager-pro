@@ -1,33 +1,15 @@
 
-export type DocumentType = 
-  | 'dni' 
-  | 'passport' 
-  | 'membership_agreement' 
-  | 'club_rules' 
-  | 'cultivation_agreement'
-  | 'medical_prescription'
-  | 'other';
-
-export const documentTypeLabels: Record<DocumentType, string> = {
-  dni: 'DNI/NIE',
-  passport: 'Pasaporte',
-  membership_agreement: 'Acuerdo de Socio',
-  club_rules: 'Reglamento del Club',
-  cultivation_agreement: 'Acuerdo de Cultivo',
-  medical_prescription: 'Prescripción Médica',
-  other: 'Otro',
-};
+export type DocumentType = 'id' | 'medical' | 'membership' | 'other';
 
 export interface Document {
   id?: number;
   memberId: number;
+  title: string;
+  description?: string;
   type: DocumentType;
-  uploadDate: Date;
-  name: string;
-  fileName: string;
-  contentType: string;
-  size: number;
-  data: Buffer | ArrayBuffer | string;
-  createdAt: Date;
-  notes?: string;
+  url?: string;
+  content?: string;
+  contentType?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
