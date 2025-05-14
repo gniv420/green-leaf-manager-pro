@@ -3,11 +3,15 @@ import { useState, useEffect } from 'react';
 import { Document, DocumentType } from '@/lib/document-types';
 import { db } from '@/lib/db';
 
+/**
+ * Custom hook for managing member documents
+ */
 export function useDocuments(memberId?: number) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
+  // Fetch documents when memberId changes
   useEffect(() => {
     if (!memberId) {
       setDocuments([]);
@@ -18,10 +22,8 @@ export function useDocuments(memberId?: number) {
     const fetchDocuments = async () => {
       try {
         setLoading(true);
-        const docs = await db.query(
-          `SELECT * FROM documents WHERE memberId = ? ORDER BY createdAt DESC`,
-          [memberId]
-        );
+        // Use getDocuments method from db
+        const docs = await db.getDocuments(memberId);
         setDocuments(docs);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Error loading documents'));
@@ -34,44 +36,34 @@ export function useDocuments(memberId?: number) {
     fetchDocuments();
   }, [memberId]);
 
+  /**
+   * Add a new document to the database
+   */
   const addDocument = async (document: Omit<Document, 'id'>) => {
     try {
-      const result = await db.run(
-        `INSERT INTO documents (memberId, type, name, fileName, contentType, size, data, uploadDate, createdAt, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          document.memberId,
-          document.type,
-          document.name,
-          document.fileName,
-          document.contentType,
-          document.size,
-          document.data,
-          document.uploadDate,
-          document.createdAt,
-          document.notes || ''
-        ]
-      );
+      // Use addDocument method from db
+      const documentId = await db.addDocument(document);
 
-      // Refetch documents after adding a new one
+      // Refresh documents list after adding
       if (memberId) {
-        const updatedDocs = await db.query(
-          `SELECT * FROM documents WHERE memberId = ? ORDER BY createdAt DESC`,
-          [memberId]
-        );
+        const updatedDocs = await db.getDocuments(memberId);
         setDocuments(updatedDocs);
       }
 
-      return result.lastID;
+      return documentId;
     } catch (err) {
       console.error('Error adding document:', err);
       throw err;
     }
   };
 
+  /**
+   * Delete a document from the database
+   */
   const deleteDocument = async (documentId: number) => {
     try {
-      await db.run(`DELETE FROM documents WHERE id = ?`, [documentId]);
+      // Use deleteDocument method from db
+      await db.deleteDocument(documentId);
       
       // Update documents list after deletion
       setDocuments(documents.filter(doc => doc.id !== documentId));
