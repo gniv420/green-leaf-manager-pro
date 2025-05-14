@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Member } from '@/lib/db';
+import { db } from '@/lib/db';
+import { useMember } from '@/hooks/use-member';
+import { useDispensaryHistory } from '@/hooks/use-dispensary-history';
+import { useCurrentCashRegister } from '@/hooks/use-cash-register';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -190,39 +192,10 @@ const MemberDetails = () => {
     }
   }, [memberId]);
 
-  const member = useLiveQuery(async () => {
-    if (!memberId) {
-      debugMemberDetails('Query aborted - no memberId');
-      return undefined;
-    }
-    
-    debugMemberDetails('Fetching member data for ID', memberId);
-    try {
-      const memberData = await db.members.get(parseInt(memberId));
-      debugMemberDetails('Query result', memberData ? 'Member found' : 'Member not found');
-      return memberData;
-    } catch (error) {
-      debugMemberDetails('Error fetching member', error);
-      return undefined;
-    }
-  }, [memberId]);
-
-  const dispensaryHistory = useLiveQuery(async () => {
-    if (!memberId) return [];
-    return await db.dispensary
-      .where('memberId')
-      .equals(parseInt(memberId))
-      .reverse()
-      .sortBy('createdAt');
-  }, [memberId]);
-
-  // Obtenemos el registro de caja abierta para validar
-  const currentCashRegister = useLiveQuery(() => {
-    return db.cashRegisters
-      .where('status')
-      .equals('open')
-      .first();
-  });
+  // Usar nuestros hooks personalizados
+  const { member, loading: memberLoading } = useMember(memberId ? parseInt(memberId) : undefined);
+  const { records: dispensaryHistory } = useDispensaryHistory(memberId ? parseInt(memberId) : undefined);
+  const { cashRegister: currentCashRegister } = useCurrentCashRegister();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -379,7 +352,7 @@ const MemberDetails = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudo actualizar el saldo del monedero"
+        description: "No se pudo actualizar el saldo del monero"
       });
     }
   };
@@ -392,7 +365,7 @@ const MemberDetails = () => {
     };
   }, []);
 
-  if (!member) {
+  if (memberLoading || !member) {
     debugMemberDetails('No member data, showing loading state');
     return (
       <div className="container mx-auto py-10">

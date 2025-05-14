@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { useDocuments } from '@/hooks/use-documents';
 import { Document, documentTypeLabels } from '@/lib/document-types';
 import { openDocument, releaseDocumentUrl } from '@/lib/document-viewer';
 import { format } from 'date-fns';
@@ -32,6 +31,7 @@ import {
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { File, Eye, Plus, Trash, ImageIcon, FileText, FileWarning } from 'lucide-react';
 import type { DocumentType } from '@/lib/document-types';
+import { db } from '@/lib/db';
 
 interface MemberDocumentsProps {
   memberId?: number;
@@ -142,7 +142,7 @@ const isImage = (contentType: string): boolean => {
   return contentType.includes('image');
 };
 
-const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
+const MemberDocuments: React.FC<{ memberId?: number }> = ({ memberId }) => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -151,24 +151,26 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
   const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
   const [thumbnailError, setThumbnailError] = useState(false);
+  const [documentTypes, setDocumentTypes] = useState<any[]>([]);
   
   const { toast } = useToast();
   
-  const documentTypes = useLiveQuery(() => db.documents.toArray(), []);
-
-  const documents = useLiveQuery(async () => {
-    if (!memberId) return [];
+  // Usar nuestro hook personalizado
+  const { documents, loading, error, addDocument, deleteDocument } = useDocuments(memberId ? parseInt(String(memberId)) : undefined);
+  
+  // Obtener los tipos de documentos
+  useEffect(() => {
+    const fetchDocumentTypes = async () => {
+      try {
+        const types = await db.documents.toArray();
+        setDocumentTypes(types);
+      } catch (error) {
+        console.error("Error loading document types:", error);
+      }
+    };
     
-    try {
-      return await db.documents
-        .where('memberId')
-        .equals(parseInt(String(memberId)))
-        .toArray();
-    } catch (error) {
-      console.error("Error loading documents:", error);
-      return [];
-    }
-  }, [memberId]);
+    fetchDocumentTypes();
+  }, []);
 
   // Clean up document URL when component unmounts or when URL changes
   useEffect(() => {
@@ -240,8 +242,8 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
       // Read the file as an ArrayBuffer
       const fileData = await file.arrayBuffer();
       
-      // Guardar la referencia en la base de datos
-      await db.documents.add({
+      // Guardar la referencia en la base de datos usando nuestro hook
+      await addDocument({
         memberId: parseInt(String(memberId)),
         type: docType as DocumentType,
         uploadDate: new Date(),
@@ -279,7 +281,7 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
     if (!documentToDelete) return;
 
     try {
-      await db.documents.delete(documentToDelete);
+      await deleteDocument(documentToDelete);
       toast({
         title: "Documento eliminado.",
         description: "El documento ha sido eliminado correctamente.",
@@ -312,7 +314,11 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {documents && documents.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-muted-foreground">Cargando documentos...</p>
+            </div>
+          ) : documents && documents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {documents.map((doc) => (
                 <Card key={doc.id} className="shadow-sm">

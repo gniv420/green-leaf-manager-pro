@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { useDispensaryHistory } from '@/hooks/use-dispensary-history';
+import { useMember } from '@/hooks/use-member';
 import {
   Table,
   TableBody,
@@ -20,50 +20,10 @@ interface MemberDispensaryHistoryProps {
 }
 
 const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ memberId }) => {
-  const dispensaryRecords = useLiveQuery(
-    async () => {
-      if (!memberId) return [];
-      
-      try {
-        const records = await db.dispensary
-          .where('memberId')
-          .equals(memberId)
-          .reverse()
-          .sortBy('createdAt');
-        
-        // Obtener información de productos
-        const products = await db.products.toArray();
-        
-        return records.map(record => {
-          const product = products.find(p => p.id === record.productId);
-          return {
-            ...record,
-            productName: product ? product.name : 'Producto desconocido'
-          };
-        });
-      } catch (error) {
-        console.error("Error loading dispensary records:", error);
-        return [];
-      }
-    },
-    [memberId]
-  );
+  const { records: dispensaryRecords, loading, totalDispensed, totalSpent } = useDispensaryHistory(memberId);
+  const { member } = useMember(memberId);
 
-  // Obtener el saldo actual del socio
-  const member = useLiveQuery(
-    async () => {
-      if (!memberId) return null;
-      try {
-        return await db.members.get(memberId);
-      } catch (error) {
-        console.error("Error loading member:", error);
-        return null;
-      }
-    },
-    [memberId]
-  );
-
-  if (!dispensaryRecords) {
+  if (loading) {
     return (
       <div className="text-center p-4">
         <p>Cargando datos...</p>
@@ -80,10 +40,6 @@ const MemberDispensaryHistory: React.FC<MemberDispensaryHistoryProps> = ({ membe
     );
   }
 
-  // Calcular totales
-  const totalDispensed = dispensaryRecords.reduce((sum, record) => sum + (record.quantity || 0), 0);
-  const totalSpent = dispensaryRecords.reduce((sum, record) => sum + (record.price || 0), 0);
-  
   // Asegurar que currentBalance siempre sea un número, con valor predeterminado 0
   const currentBalance = member?.balance ?? 0;
 
