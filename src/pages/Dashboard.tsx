@@ -1,10 +1,11 @@
+
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { db, Member, Product, Dispensary } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, User, Database, Cannabis, CircleDollarSign, BarChart, DollarSign, Coins } from 'lucide-react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { Users, Cannabis, CircleDollarSign, BarChart, DollarSign, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { db, Member, Dispensary } from '@/lib/sqlite-db';
+import { useSqliteQuery } from '@/hooks/useSqliteQuery';
 
 const Dashboard = () => {
   const [totalMembers, setTotalMembers] = useState<number>(0);
@@ -12,23 +13,20 @@ const Dashboard = () => {
   const [recentMembers, setRecentMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const currentCashRegister = useLiveQuery(() => {
-    return db.cashRegisters
-      .where('status')
-      .equals('open')
-      .first();
+  // Consultar el estado de la caja con useSqliteQuery
+  const { data: currentCashRegister, isLoading: isLoadingCashRegister } = useSqliteQuery({
+    queryKey: ['cashRegister', 'open'],
+    queryFn: async () => {
+      return await db.getOpenCashRegister();
+    }
   });
   
-  const todayTransactions = useLiveQuery(async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const transactions = await db.cashTransactions
-      .where('createdAt')
-      .aboveOrEqual(today)
-      .toArray();
-    
-    return transactions;
+  // Consultar las transacciones de hoy con useSqliteQuery
+  const { data: todayTransactions, isLoading: isLoadingTransactions } = useSqliteQuery({
+    queryKey: ['cashTransactions', 'today'],
+    queryFn: async () => {
+      return await db.getTodayTransactions();
+    }
   });
   
   const todayIncome = todayTransactions
@@ -41,47 +39,33 @@ const Dashboard = () => {
     
   const todayBalance = todayIncome - todayExpenses;
   
-  // Recent dispensary records
-  const recentDispensations = useLiveQuery(async () => {
-    try {
-      // Get 5 most recent dispensary records with member and product info
-      const dispensations = await db.dispensary
-        .orderBy('createdAt')
-        .reverse()
-        .limit(5)
-        .toArray();
-      
-      // Fetch associated members and products
-      const result = await Promise.all(dispensations.map(async (dispensation) => {
-        const member = await db.members.get(dispensation.memberId);
-        const product = await db.products.get(dispensation.productId);
-        return {
-          ...dispensation,
-          member,
-          product
-        };
-      }));
-      
-      return result.filter(r => r.member && r.product);
-    } catch (error) {
-      console.error("Error fetching recent dispensations:", error);
-      return [];
+  // Consultar dispensaciones recientes con useSqliteQuery
+  const { data: recentDispensations, isLoading: isLoadingDispensations } = useSqliteQuery({
+    queryKey: ['dispensary', 'recent'],
+    queryFn: async () => {
+      try {
+        // Obtener las 5 dispensaciones más recientes con información de miembro y producto
+        return await db.getRecentDispensations(5);
+      } catch (error) {
+        console.error("Error fetching recent dispensations:", error);
+        return [];
+      }
     }
   });
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Get total counts
-        const membersCount = await db.members.count();
-        const usersCount = await db.users.count();
+        // Obtener conteos totales
+        const membersCount = await db.getMembers().then(members => members.length);
+        const usersCount = await db.getUsers().then(users => users.length);
         
-        // Get 5 most recent members
-        const recent = await db.members
-          .orderBy('createdAt')
-          .reverse()
-          .limit(5)
-          .toArray();
+        // Obtener los 5 miembros más recientes
+        const members = await db.getMembers();
+        const sortedMembers = [...members].sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        const recent = sortedMembers.slice(0, 5);
 
         setTotalMembers(membersCount);
         setTotalUsers(usersCount);
@@ -96,7 +80,7 @@ const Dashboard = () => {
     fetchData();
   }, []);
 
-  if (isLoading) {
+  if (isLoading || isLoadingCashRegister || isLoadingTransactions || isLoadingDispensations) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
@@ -265,10 +249,10 @@ const Dashboard = () => {
                   >
                     <div className="grid gap-1">
                       <p className="font-medium">
-                        {dispensation.member?.firstName} {dispensation.member?.lastName}
+                        {dispensation.firstName} {dispensation.lastName}
                       </p>
                       <div className="text-sm text-muted-foreground">
-                        {dispensation.product?.name} - {dispensation.quantity}g
+                        {dispensation.productName} - {dispensation.quantity}g
                       </div>
                       <div className="text-xs text-muted-foreground">
                         <span className="font-mono">Pago: {dispensation.paymentMethod === 'cash' ? 'Efectivo' : dispensation.paymentMethod === 'bizum' ? 'Bizum' : 'Monedero'}</span>
