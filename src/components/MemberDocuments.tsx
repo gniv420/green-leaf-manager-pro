@@ -5,8 +5,9 @@ import { Plus, File } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Document } from '@/lib/document-types';
 import { db } from '@/lib/db';
-import { DocumentUploader } from '@/components/DocumentUploader';  // Fixed import
+import { DocumentUploader } from '@/components/DocumentUploader';
 import { DocumentViewer } from '@/lib/document-viewer';
+import { useToast } from '@/hooks/use-toast';
 
 interface MemberDocumentsProps {
   memberId: number;
@@ -16,6 +17,7 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [showUploader, setShowUploader] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -47,8 +49,18 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
       }
       
       setShowUploader(false);
+      
+      toast({
+        title: 'Documento subido',
+        description: 'El documento se ha subido correctamente'
+      });
     } catch (error) {
       console.error('Error uploading document:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo subir el documento',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -56,8 +68,17 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
     try {
       await db.documents.delete(docId);
       setDocuments(documents.filter(doc => doc.id !== docId));
+      toast({
+        title: 'Documento eliminado',
+        description: 'El documento se ha eliminado correctamente'
+      });
     } catch (error) {
       console.error('Error deleting document:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el documento',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -83,7 +104,11 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DocumentUploader onUpload={handleDocumentUpload} onCancel={() => setShowUploader(false)} />
+            <DocumentUploader 
+              memberId={memberId} 
+              onUpload={handleDocumentUpload} 
+              onCancel={() => setShowUploader(false)} 
+            />
           </CardContent>
         </Card>
       )}
@@ -99,10 +124,13 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
           {documents.map((doc) => (
             <Card key={doc.id} className="overflow-hidden">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg truncate">{doc.name}</CardTitle>
+                <CardTitle className="text-lg truncate">{doc.name || doc.title}</CardTitle>
                 <CardDescription className="text-xs">
                   {/* Convert string date to Date object for formatting */}
-                  Subido el {new Date(doc.uploadDate).toLocaleDateString()}
+                  Subido el {doc.uploadDate ? 
+                    new Date(doc.uploadDate instanceof Date ? doc.uploadDate : doc.uploadDate).toLocaleDateString() : 
+                    new Date(doc.createdAt instanceof Date ? doc.createdAt : doc.createdAt).toLocaleDateString()
+                  }
                 </CardDescription>
               </CardHeader>
               <CardContent className="pb-2">
@@ -123,7 +151,7 @@ const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
                   variant="ghost" 
                   size="sm" 
                   className="text-red-500 hover:text-red-700"
-                  onClick={() => handleDeleteDocument(doc.id as number)}
+                  onClick={() => doc.id && handleDeleteDocument(doc.id)}
                 >
                   Eliminar
                 </Button>

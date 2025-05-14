@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,9 +21,11 @@ import { useDocuments } from '@/hooks/use-documents';
 
 interface DocumentUploaderProps {
   memberId?: number;
+  onUpload?: (doc: Document) => Promise<void>;
+  onCancel?: () => void;
 }
 
-export function DocumentUploader({ memberId }: DocumentUploaderProps) {
+export function DocumentUploader({ memberId, onUpload, onCancel }: DocumentUploaderProps) {
   const [selectedType, setSelectedType] = useState<DocumentType>('other');
   const [documentName, setDocumentName] = useState('');
   const [notes, setNotes] = useState('');
@@ -62,17 +63,40 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
       const docData: Omit<Document, 'id'> = {
         memberId,
         type: selectedType,
+        title: documentName || file.name,
         name: documentName || file.name,
         fileName: file.name,
         contentType: file.type,
         size: file.size,
         data: buffer,
+        content: buffer,
         uploadDate: new Date(),
         createdAt: new Date(),
         notes: notes || '',
       };
       
-      // Guardar en la base de datos
+      // If using the onUpload callback directly
+      if (onUpload) {
+        await onUpload(docData as Document);
+        
+        // Limpiar el formulario
+        setSelectedType('other');
+        setDocumentName('');
+        setNotes('');
+        setFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        
+        toast({
+          title: 'Documento guardado',
+          description: 'El documento se ha guardado correctamente'
+        });
+        
+        return;
+      }
+      
+      // Otherwise use the hook
       await addDocument(docData);
       
       // Limpiar el formulario
@@ -180,55 +204,75 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
               />
             </div>
             
-            <Button 
-              className="w-full" 
-              onClick={uploadDocument}
-              disabled={!file || loading} 
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              {loading ? 'Subiendo...' : 'Subir documento'}
-            </Button>
+            <div className="flex justify-between gap-2">
+              {onCancel && (
+                <Button 
+                  variant="outline" 
+                  onClick={onCancel}
+                  type="button"
+                >
+                  Cancelar
+                </Button>
+              )}
+              <Button 
+                className={onCancel ? "flex-1" : "w-full"} 
+                onClick={uploadDocument}
+                disabled={!file || loading} 
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {loading ? 'Subiendo...' : 'Subir documento'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Documentos ({documents?.length || 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {documentsLoading ? (
-            <div className="flex justify-center py-4">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
-            </div>
-          ) : documents?.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground">
-              No hay documentos disponibles
-            </div>
-          ) : (
-            <div className="divide-y">
-              {documents.map((doc) => (
-                <div key={doc.id} className="py-3 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">{doc.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {documentTypeLabels[doc.type]} • {format(new Date(doc.uploadDate), 'dd/MM/yyyy', { locale: es })}
-                    </p>
+
+      {/* Only show documents list if not using in callback mode */}
+      {!onUpload && !onCancel && documents && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Documentos ({documents?.length || 0})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {documentsLoading ? (
+              <div className="flex justify-center py-4">
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+              </div>
+            ) : documents?.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                No hay documentos disponibles
+              </div>
+            ) : (
+              <div className="divide-y">
+                {documents.map((doc) => (
+                  <div key={doc.id} className="py-3 flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{doc.name || doc.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {documentTypeLabels[doc.type]} • {
+                          doc.uploadDate ? 
+                            (typeof doc.uploadDate === 'string' ? 
+                              format(new Date(doc.uploadDate), 'dd/MM/yyyy', { locale: es }) :
+                              format(doc.uploadDate, 'dd/MM/yyyy', { locale: es }))
+                            : format(new Date(), 'dd/MM/yyyy', { locale: es })
+                        }
+                      </p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => doc.id && handleDeleteDocument(doc.id)}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => doc.id && handleDeleteDocument(doc.id)}
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

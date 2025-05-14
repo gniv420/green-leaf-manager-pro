@@ -11,23 +11,22 @@ export interface User {
 
 export interface Member {
   id?: number;
-  memberCode: string;
   firstName: string;
   lastName: string;
-  dni: string;
   email: string;
-  phone: string;
-  dob: string; // Cambiado a string para SQLite
-  address: string;
-  city: string;
-  postalCode: string;
-  joinDate: string; // Cambiado a string para SQLite
-  consumptionGrams: number;
+  phone?: string;
+  dateOfBirth?: Date | string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  idNumber?: string;
+  membershipType: "standard" | "premium";
+  membershipDate: Date | string;
+  preferredProductType?: string;
+  consumptionMethod?: string;
+  medicalConditions?: string;
   notes?: string;
-  status: 'active' | 'inactive' | 'pending';
-  balance?: number;
-  sponsorId?: number | null;
-  rfidCode?: string;
+  isActive: boolean;
   createdAt: string; // Cambiado a string para SQLite
   updatedAt: string; // Cambiado a string para SQLite
 }

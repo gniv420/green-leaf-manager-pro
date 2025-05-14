@@ -44,9 +44,9 @@ const DocumentsSection: React.FC<Props> = ({ memberId }) => {
           key={doc.id}
           className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
         >
-          <h3 className="font-medium text-lg truncate">{doc.name}</h3>
+          <h3 className="font-medium text-lg truncate">{doc.name || doc.title}</h3>
           <p className="text-sm text-gray-500 mb-2">
-            {new Date(doc.uploadDate).toLocaleDateString()}
+            {new Date(doc.uploadDate instanceof Date ? doc.uploadDate : doc.uploadDate || doc.createdAt).toLocaleDateString()}
           </p>
           
           <div className="mt-2 flex justify-between items-center">
