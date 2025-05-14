@@ -1,9 +1,13 @@
 
-export const openDocument = (doc: { data: Buffer | ArrayBuffer, contentType: string }): string => {
+export const openDocument = (doc: { data: Buffer | ArrayBuffer | string, contentType: string }): string => {
   try {
     // Convertir el ArrayBuffer o Buffer a Blob
     let blob;
-    if (doc.data instanceof ArrayBuffer) {
+    
+    if (typeof doc.data === 'string') {
+      // Si es una cadena (base64 o URL de datos), usarla directamente
+      return doc.data;
+    } else if (doc.data instanceof ArrayBuffer) {
       blob = new Blob([doc.data], { type: doc.contentType });
     } else {
       // Convertir Buffer a ArrayBuffer primero si es necesario
@@ -22,7 +26,9 @@ export const openDocument = (doc: { data: Buffer | ArrayBuffer, contentType: str
 
 export const releaseDocumentUrl = (url: string): void => {
   try {
-    URL.revokeObjectURL(url);
+    if (!url.startsWith('data:')) {
+      URL.revokeObjectURL(url);
+    }
   } catch (error) {
     console.error('Error releasing document URL:', error);
   }

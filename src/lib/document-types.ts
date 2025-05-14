@@ -22,11 +22,12 @@ export interface Document {
   id?: number;
   memberId: number;
   type: DocumentType;
-  uploadDate: string;
+  uploadDate: Date;
   name: string;
   fileName: string;
   contentType: string;
   size: number;
-  data: Buffer;
-  createdAt: string;
+  data: Buffer | ArrayBuffer | string;
+  createdAt: Date;
+  notes?: string;
 }

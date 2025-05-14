@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import { Document, DocumentType, documentTypeLabels } from '@/lib/document-types
 import { FileText, Upload, Trash } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useDocuments } from '@/hooks/use-documents';
 
 interface DocumentUploaderProps {
   memberId?: number;
@@ -28,37 +30,10 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
   const [notes, setNotes] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [documents, setDocuments] = useState<Document[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-
-  // Cargar documentos cuando cambia el ID del miembro
-  React.useEffect(() => {
-    if (memberId) {
-      loadDocuments();
-    }
-  }, [memberId]);
-
-  // Función para cargar los documentos
-  const loadDocuments = async () => {
-    if (!memberId) return;
-    
-    try {
-      const docs = await db.documents
-        .where('memberId')
-        .equals(memberId)
-        .toArray();
-      
-      setDocuments(docs);
-    } catch (error) {
-      console.error('Error al cargar documentos:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudieron cargar los documentos',
-        variant: 'destructive'
-      });
-    }
-  };
+  
+  const { documents, loading: documentsLoading, addDocument, deleteDocument } = useDocuments(memberId);
 
   // Función para manejar la selección de archivos
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,7 +59,7 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
       const buffer = await file.arrayBuffer();
       
       // Crear el registro del documento
-      const docData: Document = {
+      const docData: Omit<Document, 'id'> = {
         memberId,
         type: selectedType,
         name: documentName || file.name,
@@ -98,7 +73,7 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
       };
       
       // Guardar en la base de datos
-      await db.documents.add(docData);
+      await addDocument(docData);
       
       // Limpiar el formulario
       setSelectedType('other');
@@ -114,9 +89,6 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
         description: 'El documento se ha guardado correctamente'
       });
       
-      // Recargar la lista de documentos
-      await loadDocuments();
-      
     } catch (error) {
       console.error('Error al guardar documento:', error);
       toast({
@@ -130,18 +102,15 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
   };
   
   // Función para eliminar un documento
-  const deleteDocument = async (documentId: number) => {
+  const handleDeleteDocument = async (documentId: number) => {
     if (!documentId) return;
     
     try {
-      await db.documents.delete(documentId);
+      await deleteDocument(documentId);
       toast({
         title: 'Documento eliminado',
         description: 'El documento se ha eliminado correctamente'
       });
-      
-      // Actualizar la lista de documentos
-      await loadDocuments();
     } catch (error) {
       console.error('Error al eliminar documento:', error);
       toast({
@@ -225,10 +194,14 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
       
       <Card>
         <CardHeader>
-          <CardTitle>Documentos ({documents.length})</CardTitle>
+          <CardTitle>Documentos ({documents?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent>
-          {documents.length === 0 ? (
+          {documentsLoading ? (
+            <div className="flex justify-center py-4">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+            </div>
+          ) : documents?.length === 0 ? (
             <div className="text-center py-4 text-muted-foreground">
               No hay documentos disponibles
             </div>
@@ -246,7 +219,7 @@ export function DocumentUploader({ memberId }: DocumentUploaderProps) {
                     variant="ghost" 
                     size="sm" 
                     className="text-destructive hover:text-destructive"
-                    onClick={() => doc.id && deleteDocument(doc.id)}
+                    onClick={() => doc.id && handleDeleteDocument(doc.id)}
                   >
                     <Trash className="h-4 w-4" />
                   </Button>
