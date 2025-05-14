@@ -22,8 +22,8 @@ export function useDocuments(memberId?: number) {
     const fetchDocuments = async () => {
       try {
         setLoading(true);
-        // Use getDocuments method from db
-        const docs = await db.getDocuments(memberId);
+        // Use the correct method from the SQLiteDB instance
+        const docs = await db.documents.where('memberId').equals(memberId).toArray();
         setDocuments(docs);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Error loading documents'));
@@ -41,12 +41,12 @@ export function useDocuments(memberId?: number) {
    */
   const addDocument = async (document: Omit<Document, 'id'>) => {
     try {
-      // Use addDocument method from db
-      const documentId = await db.addDocument(document);
+      // Use the correct method to add a document
+      const documentId = await db.documents.add(document);
 
       // Refresh documents list after adding
       if (memberId) {
-        const updatedDocs = await db.getDocuments(memberId);
+        const updatedDocs = await db.documents.where('memberId').equals(memberId).toArray();
         setDocuments(updatedDocs);
       }
 
@@ -62,8 +62,8 @@ export function useDocuments(memberId?: number) {
    */
   const deleteDocument = async (documentId: number) => {
     try {
-      // Use deleteDocument method from db
-      await db.deleteDocument(documentId);
+      // Use the correct method to delete a document
+      await db.documents.delete(documentId);
       
       // Update documents list after deletion
       setDocuments(documents.filter(doc => doc.id !== documentId));
