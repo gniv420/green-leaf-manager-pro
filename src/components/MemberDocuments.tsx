@@ -1,13 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
-import { Document, DocumentType } from '@/lib/document-types';
+import React, { useEffect, useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Plus, File } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Document } from '@/lib/document-types';
 import { db } from '@/lib/db';
-import { toast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import DocumentUploader from '@/components/DocumentUploader';
+import { DocumentUploader } from '@/components/DocumentUploader';  // Fixed import
 import { DocumentViewer } from '@/lib/document-viewer';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { FileIcon, Trash2 } from 'lucide-react';
 
 interface MemberDocumentsProps {
   memberId: number;
@@ -15,228 +14,124 @@ interface MemberDocumentsProps {
 
 const MemberDocuments: React.FC<MemberDocumentsProps> = ({ memberId }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [showUploader, setShowUploader] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isUploaderOpen, setIsUploaderOpen] = useState(false);
-  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-  // Cargar documentos
   useEffect(() => {
-    const loadDocuments = async () => {
+    const fetchDocuments = async () => {
       try {
-        setLoading(true);
-        const docs = await db.documents.where('memberId').equals(memberId).toArray();
-        setDocuments(docs);
+        if (memberId) {
+          const docs = await db.documents.where('memberId').equals(memberId).toArray();
+          setDocuments(docs);
+        }
       } catch (error) {
-        console.error('Error loading documents:', error);
-        toast({
-          title: 'Error',
-          description: 'No se pudieron cargar los documentos',
-          variant: 'destructive',
-        });
+        console.error('Error fetching documents:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (memberId) {
-      loadDocuments();
-    }
+    fetchDocuments();
   }, [memberId]);
 
-  // Handle file upload
-  const handleFileUpload = async (file: File, documentType: DocumentType, documentName: string) => {
+  const handleDocumentUpload = async (newDoc: Document) => {
     try {
-      // Create a FileReader to read the file as an ArrayBuffer
-      const reader = new FileReader();
+      // Add the memberId to the document
+      const docWithMemberId = { ...newDoc, memberId };
+      const id = await db.documents.add(docWithMemberId);
       
-      reader.onload = async (event) => {
-        if (!event.target?.result) {
-          throw new Error('Failed to read file');
-        }
-        
-        // Convert the ArrayBuffer to a Buffer for SQLite storage
-        const buffer = Buffer.from(event.target.result as ArrayBuffer);
-        
-        // Create the document object
-        const document: Omit<Document, 'id'> = {
-          memberId,
-          type: documentType,
-          uploadDate: new Date().toISOString(),
-          name: documentName || file.name,
-          fileName: file.name,
-          contentType: file.type,
-          size: file.size,
-          data: buffer,
-          createdAt: new Date().toISOString(),
-        };
-        
-        // Save to database
-        await db.documents.add(document);
-        
-        // Reload documents
-        const updatedDocs = await db.documents.where('memberId').equals(memberId).toArray();
-        setDocuments(updatedDocs);
-        
-        toast({
-          title: 'Éxito',
-          description: 'Documento subido correctamente',
-        });
-        
-        // Close uploader
-        setIsUploaderOpen(false);
-      };
+      // Refresh documents list
+      const updatedDoc = await db.documents.get(id);
+      if (updatedDoc) {
+        setDocuments([...documents, updatedDoc]);
+      }
       
-      reader.onerror = () => {
-        throw new Error('Error reading file');
-      };
-      
-      // Start reading the file
-      reader.readAsArrayBuffer(file);
+      setShowUploader(false);
     } catch (error) {
       console.error('Error uploading document:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo subir el documento',
-        variant: 'destructive',
-      });
     }
   };
 
-  // Preparar eliminación de un documento
-  const prepareDeleteDocument = (document: Document) => {
-    setDocumentToDelete(document);
-    setConfirmDeleteOpen(true);
-  };
-
-  // Confirmar eliminación
-  const confirmDeleteDocument = async () => {
+  const handleDeleteDocument = async (docId: number) => {
     try {
-      if (!documentToDelete?.id) return;
-      
-      await db.documents.delete(documentToDelete.id);
-      
-      // Actualizar la lista de documentos
-      setDocuments(documents.filter(doc => doc.id !== documentToDelete.id));
-      
-      toast({
-        title: 'Éxito',
-        description: 'Documento eliminado correctamente',
-      });
+      await db.documents.delete(docId);
+      setDocuments(documents.filter(doc => doc.id !== docId));
     } catch (error) {
       console.error('Error deleting document:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo eliminar el documento',
-        variant: 'destructive',
-      });
-    } finally {
-      setConfirmDeleteOpen(false);
-      setDocumentToDelete(null);
     }
   };
 
-  // Obtener traducción del tipo de documento
-  const getDocumentTypeLabel = (type: string): string => {
-    const typeMap: Record<string, string> = {
-      id: 'DNI/NIE',
-      registration: 'Registro de Socios',
-      membership: 'Acuerdo de Membresía',
-      medical: 'Certificado Médico',
-      consumption: 'Declaración de Consumo',
-      other: 'Otro',
-    };
-    
-    return typeMap[type] || 'Desconocido';
-  };
-
-  // Renderizar icono según tipo de documento
-  const getDocumentIcon = (contentType: string) => {
-    return <FileIcon className="h-10 w-10 text-gray-400" />;
-  };
+  if (loading) {
+    return <div className="flex items-center justify-center p-8">Cargando documentos...</div>;
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Documentación</h2>
-        <Button onClick={() => setIsUploaderOpen(true)}>Subir Documento</Button>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Documentos</h2>
+        <Button onClick={() => setShowUploader(true)} className="flex items-center gap-1">
+          <Plus size={16} /> Añadir documento
+        </Button>
       </div>
 
-      {loading ? (
-        <div className="text-center py-8">Cargando documentos...</div>
-      ) : documents.length === 0 ? (
-        <div className="text-center py-8 border border-dashed rounded-lg">
-          <p className="text-gray-500">No hay documentos para este miembro</p>
-          <Button variant="outline" className="mt-2" onClick={() => setIsUploaderOpen(true)}>
-            Subir Primer Documento
-          </Button>
-        </div>
+      {showUploader && (
+        <Card className="border border-gray-200">
+          <CardHeader>
+            <CardTitle>Subir nuevo documento</CardTitle>
+            <CardDescription>
+              Sube un documento para este socio
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DocumentUploader onUpload={handleDocumentUpload} onCancel={() => setShowUploader(false)} />
+          </CardContent>
+        </Card>
+      )}
+
+      {documents.length === 0 && !showUploader ? (
+        <Card>
+          <CardContent className="p-8 text-center text-gray-500">
+            No hay documentos para este socio.
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {documents.map(doc => (
-            <div key={doc.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors flex justify-between">
-              <div className="flex items-center">
-                <div className="mr-4">
-                  {getDocumentIcon(doc.contentType)}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {documents.map((doc) => (
+            <Card key={doc.id} className="overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg truncate">{doc.name}</CardTitle>
+                <CardDescription className="text-xs">
+                  {/* Convert string date to Date object for formatting */}
+                  Subido el {new Date(doc.uploadDate).toLocaleDateString()}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pb-2">
+                <div className="flex items-center gap-2">
+                  <File size={16} className="text-blue-600" />
+                  <span className="text-sm text-gray-600">{doc.contentType}</span>
                 </div>
-                <div>
-                  <h3 className="font-medium">{doc.name}</h3>
-                  <p className="text-sm text-gray-500">
-                    {getDocumentTypeLabel(doc.type)}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {new Date(doc.uploadDate).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col space-y-2">
+              </CardContent>
+              <CardFooter className="flex justify-between pt-2">
                 <Button 
-                  variant="ghost" 
+                  variant="outline" 
                   size="sm"
                   onClick={() => DocumentViewer.openDocument(doc)}
                 >
-                  Ver
+                  Ver documento
                 </Button>
                 <Button 
                   variant="ghost" 
-                  size="sm"
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => prepareDeleteDocument(doc)}
+                  size="sm" 
+                  className="text-red-500 hover:text-red-700"
+                  onClick={() => handleDeleteDocument(doc.id as number)}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  Eliminar
                 </Button>
-              </div>
-            </div>
+              </CardFooter>
+            </Card>
           ))}
         </div>
       )}
-
-      {/* Uploader Dialog */}
-      {isUploaderOpen && (
-        <DocumentUploader
-          open={isUploaderOpen}
-          onClose={() => setIsUploaderOpen(false)}
-          onUpload={handleFileUpload}
-        />
-      )}
-
-      {/* Confirm Delete Dialog */}
-      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. El documento será eliminado permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteDocument} className="bg-red-500 hover:bg-red-600">
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

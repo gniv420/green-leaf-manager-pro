@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '@/lib/db';
@@ -6,18 +5,17 @@ import { toast } from '@/hooks/use-toast';
 import { User } from '@/lib/db';
 
 interface AuthContextType {
-  currentUser: User | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  user: User | null;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  isAuthenticated: boolean;
-  loading: boolean;
+  isLoading: boolean; // Add isLoading property
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   
   // Check if user is already logged in (from localStorage)
@@ -28,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (savedUserId) {
           const user = await db.getUserById(Number(savedUserId));
           if (user) {
-            setCurrentUser(user);
+            setUser(user);
           } else {
             // If user not found, clear localStorage
             localStorage.removeItem('userId');
@@ -37,17 +35,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (error) {
         console.error('Authentication check error:', error);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     
     checkAuthentication();
   }, []);
   
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
       // Use the fixed method that properly returns a user directly
-      const user = await db.users.where('username').equals(username).first();
+      const user = await db.users.where('email').equals(email).first();
       
       if (user && user.password === password) {
         // Update last login time
@@ -57,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Update user data with last login time
         const updatedUser = { ...user, lastLogin: new Date().toISOString() };
-        setCurrentUser(updatedUser);
+        setUser(updatedUser);
         
         // Store user ID in localStorage
         localStorage.setItem('userId', String(user.id));
@@ -83,17 +81,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   const logout = () => {
-    setCurrentUser(null);
+    setUser(null);
     localStorage.removeItem('userId');
     navigate('/login');
   };
   
   const value = {
-    currentUser,
+    user,
     login,
     logout,
-    isAuthenticated: !!currentUser,
-    loading
+    isLoading
   };
   
   return (

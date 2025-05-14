@@ -1,254 +1,435 @@
 
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { db } from '@/lib/db';
-import { Member } from '@/lib/db';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import MemberCard from '@/components/MemberCard';
-import { toast } from '@/hooks/use-toast';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Search } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { db } from "@/lib/db";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
+import { 
+  Plus, 
+  Search, 
+  User, 
+  Filter, 
+  SlidersHorizontal, 
+  MoreVertical, 
+  UserPlus, 
+  X, 
+  AlertCircle
+} from "lucide-react";
+import MemberCard from "@/components/MemberCard";
+import { useDebounce } from "@/hooks/use-debounce";
 
-export default function Members() {
+// Define Member type for TypeScript
+interface Member {
+  id?: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  membershipType: string;
+  membershipDate: Date;
+  isActive: boolean;
+  preferredProductType?: string;
+  consumptionMethod?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  dateOfBirth?: Date;
+  idNumber?: string;
+  medicalConditions?: string;
+  notes?: string;
+}
+
+// Define props for MemberCard component to fix type error
+interface MemberCardProps {
+  member: Member;
+  onEdit?: () => void;
+  onView?: () => void;
+}
+
+const Members = () => {
   const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>([]);
   const [filteredMembers, setFilteredMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [rfidCode, setRfidCode] = useState('');
-  const [rfidSearchMode, setRfidSearchMode] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [membershipFilter, setMembershipFilter] = useState<string>("all");
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
-  // Cargar miembros
+  // Alert dialog state
+  const [deleteMemberId, setDeleteMemberId] = useState<number | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  // Load members from database
   useEffect(() => {
-    const loadMembers = async () => {
+    const fetchMembers = async () => {
       try {
-        const memberList = await db.members.toArray();
-        setMembers(memberList);
-        setFilteredMembers(memberList);
+        setLoading(true);
+        const allMembers = await db.members.toArray();
+        
+        // Convert membershipDate strings to Date objects if needed
+        const formattedMembers = allMembers.map(member => ({
+          ...member,
+          membershipDate: member.membershipDate instanceof Date 
+            ? member.membershipDate 
+            : new Date(member.membershipDate)
+        }));
+        
+        setMembers(formattedMembers);
+        setFilteredMembers(formattedMembers);
       } catch (error) {
-        console.error('Error loading members:', error);
+        console.error("Error fetching members:", error);
         toast({
-          title: 'Error',
-          description: 'No se pudieron cargar los miembros',
-          variant: 'destructive',
+          title: "Error",
+          description: "Ha ocurrido un error al cargar los socios",
+          variant: "destructive",
         });
       } finally {
         setLoading(false);
       }
     };
     
-    loadMembers();
+    fetchMembers();
   }, []);
   
-  // Filtrar miembros basado en la búsqueda
+  // Filter members based on search term and filters
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredMembers(members);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = members.filter(member => 
-        member.firstName.toLowerCase().includes(query) || 
-        member.lastName.toLowerCase().includes(query) || 
-        member.dni.toLowerCase().includes(query) || 
-        member.memberCode.toLowerCase().includes(query)
+    let result = [...members];
+    
+    // Apply search filter
+    if (debouncedSearchTerm) {
+      const searchTermLower = debouncedSearchTerm.toLowerCase();
+      result = result.filter((member) => 
+        member.firstName.toLowerCase().includes(searchTermLower) || 
+        member.lastName.toLowerCase().includes(searchTermLower) || 
+        member.email.toLowerCase().includes(searchTermLower) ||
+        (member.phone && member.phone.includes(searchTermLower))
       );
-      setFilteredMembers(filtered);
     }
-  }, [searchQuery, members]);
-  
-  // Escuchar eventos de teclado para el lector RFID
-  useEffect(() => {
-    let rfidBuffer = '';
-    let rfidTimeout: NodeJS.Timeout;
     
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Solo procesar en modo búsqueda RFID o si es un input específico para RFID
-      if (!rfidSearchMode) return;
-      
-      // Evitar procesar teclas si el foco está en un input
-      if (document.activeElement instanceof HTMLInputElement || 
-          document.activeElement instanceof HTMLTextAreaElement) {
-        return;
-      }
-      
-      // Resetear el timeout cada vez que se pulsa una tecla
-      clearTimeout(rfidTimeout);
-      
-      // Si es un número o una tecla que podría ser parte del código RFID
-      if (/[\d\w]/.test(e.key) && e.key.length === 1) {
-        rfidBuffer += e.key;
-        e.preventDefault(); // Prevenir comportamiento por defecto
-      }
-      
-      // Enter podría indicar el final de la lectura
-      if (e.key === 'Enter' && rfidBuffer.length > 0) {
-        handleRfidSearch(rfidBuffer);
-        rfidBuffer = '';
-        e.preventDefault(); // Prevenir comportamiento por defecto
-      }
-      
-      // Establecer timeout para limpiar el buffer si no hay más input
-      rfidTimeout = setTimeout(() => {
-        if (rfidBuffer.length > 5) {
-          handleRfidSearch(rfidBuffer);
-        }
-        rfidBuffer = '';
-      }, 500); // 500ms timeout
-    };
-    
-    // Añadir event listener
-    window.addEventListener('keydown', handleKeyDown);
-    
-    // Limpiar al desmontar
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      clearTimeout(rfidTimeout);
-    };
-  }, [rfidSearchMode]);
-  
-  // Manejar búsqueda por RFID
-  const handleRfidSearch = async (code: string) => {
-    try {
-      if (!code) return;
-      
-      const member = await db.members.where('rfidCode').equals(code).first();
-      
-      if (member) {
-        // Navegar a detalles del miembro si se encuentra
-        toast({
-          title: 'Miembro encontrado',
-          description: `${member.firstName} ${member.lastName}`,
-        });
-        navigate(`/members/${member.id}`);
-      } else {
-        toast({
-          title: 'Miembro no encontrado',
-          description: 'No se encontró ningún miembro con ese código RFID',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error searching by RFID:', error);
-      toast({
-        title: 'Error',
-        description: 'Error al buscar por RFID',
-        variant: 'destructive',
-      });
-    } finally {
-      setRfidCode('');
+    // Apply status filter
+    if (statusFilter !== "all") {
+      const isActive = statusFilter === "active";
+      result = result.filter((member) => member.isActive === isActive);
     }
+    
+    // Apply membership filter
+    if (membershipFilter !== "all") {
+      result = result.filter((member) => 
+        member.membershipType.toLowerCase() === membershipFilter
+      );
+    }
+    
+    setFilteredMembers(result);
+  }, [debouncedSearchTerm, members, statusFilter, membershipFilter]);
+  
+  // Handle member deletion
+  const confirmDeleteMember = (id: number) => {
+    setDeleteMemberId(id);
+    setIsDeleteDialogOpen(true);
   };
   
-  // Confirmar y eliminar miembro
   const handleDeleteMember = async () => {
-    if (memberToDelete === null) return;
-    
-    try {
-      await db.deleteMember(memberToDelete);
-      
-      // Actualizar listado
-      setMembers(members.filter(member => member.id !== memberToDelete));
-      setFilteredMembers(filteredMembers.filter(member => member.id !== memberToDelete));
-      
-      toast({
-        title: 'Éxito',
-        description: 'Miembro eliminado correctamente',
-      });
-    } catch (error) {
-      console.error('Error deleting member:', error);
-      toast({
-        title: 'Error',
-        description: 'Error al eliminar el miembro',
-        variant: 'destructive',
-      });
-    } finally {
-      setMemberToDelete(null);
-      setDeleteDialogOpen(false);
+    if (deleteMemberId) {
+      try {
+        // Get member info for toast message
+        const member = members.find(m => m.id === deleteMemberId);
+        
+        // Delete member from database
+        await db.members.delete(deleteMemberId);
+        
+        // Update state
+        const updatedMembers = members.filter(m => m.id !== deleteMemberId);
+        setMembers(updatedMembers);
+        setFilteredMembers(
+          filteredMembers.filter(m => m.id !== deleteMemberId)
+        );
+        
+        // Show success message
+        toast({
+          title: "Socio eliminado",
+          description: member 
+            ? `${member.firstName} ${member.lastName} ha sido eliminado correctamente` 
+            : "El socio ha sido eliminado correctamente",
+        });
+      } catch (error) {
+        console.error("Error deleting member:", error);
+        toast({
+          title: "Error",
+          description: "Ha ocurrido un error al eliminar el socio",
+          variant: "destructive",
+        });
+      }
     }
+    // Close dialog
+    setIsDeleteDialogOpen(false);
+    setDeleteMemberId(null);
   };
   
-  // Preparar eliminación de miembro
-  const confirmDeleteMember = (memberId: number) => {
-    setMemberToDelete(memberId);
-    setDeleteDialogOpen(true);
+  // Handle navigation to member details
+  const handleViewMember = (id: number) => {
+    navigate(`/members/${id}`);
+  };
+  
+  // Handle navigation to edit member
+  const handleEditMember = (id: number) => {
+    navigate(`/members/${id}`);
+  };
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setMembershipFilter("all");
+    setShowFilters(false);
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Gestión de Miembros</h1>
-        <div className="space-x-2">
-          <Button 
-            variant={rfidSearchMode ? "default" : "outline"} 
-            onClick={() => setRfidSearchMode(!rfidSearchMode)}
-          >
-            {rfidSearchMode ? "Modo RFID Activo" : "Modo RFID"}
+    <div className="container py-6">
+      <div className="flex flex-col space-y-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Socios</h1>
+          <Button onClick={() => navigate("/members/new")} className="flex items-center gap-2">
+            <UserPlus size={16} />
+            <span className="hidden sm:inline">Nuevo Socio</span>
           </Button>
-          <Link to="/members/new">
-            <Button>Nuevo Miembro</Button>
-          </Link>
         </div>
+        
+        <div className="flex flex-col md:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+            <Input
+              placeholder="Buscar socios..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2"
+          >
+            <Filter size={16} />
+            <span>Filtros</span>
+          </Button>
+        </div>
+
+        {showFilters && (
+          <Card className="mb-4">
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal size={18} />
+                  <CardTitle className="text-lg">Filtros</CardTitle>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setShowFilters(false)}
+                >
+                  <X size={18} />
+                  <span className="sr-only">Cerrar</span>
+                </Button>
+              </div>
+              <CardDescription>
+                Filtra la lista de socios por estado y tipo de membresía
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Estado</label>
+                  <Select
+                    value={statusFilter}
+                    onValueChange={setStatusFilter}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="active">Activos</SelectItem>
+                      <SelectItem value="inactive">Inactivos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Tipo de Membresía</label>
+                  <Select
+                    value={membershipFilter}
+                    onValueChange={setMembershipFilter}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="standard">Estándar</SelectItem>
+                      <SelectItem value="premium">Premium</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between border-t pt-4">
+              <Button
+                variant="ghost"
+                onClick={clearFilters}
+              >
+                Limpiar Filtros
+              </Button>
+              <Button 
+                onClick={() => setShowFilters(false)}
+              >
+                Aplicar
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <p>Cargando socios...</p>
+          </div>
+        ) : filteredMembers.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            {filteredMembers.map((member) => (
+              <Card key={member.id} className="overflow-hidden flex flex-col">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <User size={18} className="text-primary" />
+                    {member.firstName} {member.lastName}
+                  </CardTitle>
+                  <CardDescription>{member.email}</CardDescription>
+                </CardHeader>
+                <CardContent className="py-2 flex-grow">
+                  <div className="space-y-2">
+                    {member.phone && (
+                      <p className="text-sm">📱 {member.phone}</p>
+                    )}
+                    <p className="text-sm">
+                      🔖 {member.membershipType.charAt(0).toUpperCase() + member.membershipType.slice(1)}
+                    </p>
+                    <p className="text-sm">
+                      📅 Miembro desde: {member.membershipDate.toLocaleDateString()}
+                    </p>
+                    {!member.isActive && (
+                      <div className="flex items-center gap-1 text-amber-600 text-sm font-medium mt-2">
+                        <AlertCircle size={14} />
+                        <span>Inactivo</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter className="pt-2 border-t flex justify-between">
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewMember(member.id as number)}
+                  >
+                    Ver detalles
+                  </Button>
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical size={16} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => handleEditMember(member.id as number)}
+                      >
+                        Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => confirmDeleteMember(member.id as number)}
+                        className="text-red-600"
+                      >
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="border rounded-lg p-12 text-center">
+            <div className="flex justify-center mb-4">
+              <User size={64} className="text-gray-300" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No se encontraron socios</h3>
+            <p className="text-gray-500 mb-6">
+              {debouncedSearchTerm || statusFilter !== "all" || membershipFilter !== "all"
+                ? "No hay socios que coincidan con tus filtros. Intenta con otros criterios."
+                : "Aún no has añadido ningún socio. Crea uno nuevo para comenzar."}
+            </p>
+            {debouncedSearchTerm || statusFilter !== "all" || membershipFilter !== "all" ? (
+              <Button variant="outline" onClick={clearFilters}>
+                Limpiar filtros
+              </Button>
+            ) : (
+              <Button onClick={() => navigate("/members/new")} className="flex items-center gap-2">
+                <Plus size={16} />
+                <span>Añadir socio</span>
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       
-      {/* Barra de búsqueda */}
-      <div className="relative mb-6">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-        <Input
-          placeholder="Buscar miembros por nombre, DNI o código..."
-          className="pl-8"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-      
-      {/* Información de modo RFID */}
-      {rfidSearchMode && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
-          <p className="flex items-center">
-            <span className="mr-2">•</span>
-            <span>Modo RFID activado. Escanee una tarjeta para buscar el miembro.</span>
-          </p>
-        </div>
-      )}
-      
-      {loading ? (
-        <div className="text-center py-8">Cargando miembros...</div>
-      ) : (
-        <>
-          {filteredMembers.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              {searchQuery ? 'No se encontraron miembros con esa búsqueda' : 'No hay miembros registrados'}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredMembers.map(member => (
-                <MemberCard 
-                  key={member.id} 
-                  member={member} 
-                  onDelete={() => member.id && confirmDeleteMember(member.id)} 
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-      
-      {/* Diálogo de confirmación para eliminar */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. El miembro será eliminado permanentemente 
-              junto con todos sus datos asociados.
+              Esta acción no se puede deshacer. El socio será eliminado permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteMember} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogAction onClick={handleDeleteMember} className="bg-red-600 hover:bg-red-700">
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -256,4 +437,6 @@ export default function Members() {
       </AlertDialog>
     </div>
   );
-}
+};
+
+export default Members;

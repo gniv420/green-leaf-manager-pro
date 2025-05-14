@@ -1,35 +1,25 @@
 
-export const openDocument = (doc: { data: Buffer | ArrayBuffer | string, contentType: string }): string => {
-  try {
-    // Convertir el ArrayBuffer o Buffer a Blob
-    let blob;
-    
-    if (typeof doc.data === 'string') {
-      // Si es una cadena (base64 o URL de datos), usarla directamente
-      return doc.data;
-    } else if (doc.data instanceof ArrayBuffer) {
-      blob = new Blob([doc.data], { type: doc.contentType });
-    } else {
-      // Convertir Buffer a ArrayBuffer primero si es necesario
-      const arrayBuffer = new Uint8Array(doc.data).buffer;
-      blob = new Blob([arrayBuffer], { type: doc.contentType });
-    }
-    
-    // Crear URL para el blob
-    const url = URL.createObjectURL(blob);
-    return url;
-  } catch (error) {
-    console.error('Error opening document:', error);
-    return '';
-  }
-};
+import { Document } from '@/lib/document-types';
 
-export const releaseDocumentUrl = (url: string): void => {
-  try {
-    if (!url.startsWith('data:')) {
-      URL.revokeObjectURL(url);
+/**
+ * Utility for viewing documents
+ */
+export const DocumentViewer = {
+  /**
+   * Opens a document in the appropriate viewer
+   */
+  openDocument: (document: Document) => {
+    // Check if document has content or URL
+    if (document.content) {
+      // Create blob URL from content
+      const blob = new Blob([document.content], { type: document.contentType });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } else if (document.url) {
+      // Open URL directly
+      window.open(document.url, '_blank');
+    } else {
+      console.error('Document has no content or URL to display');
     }
-  } catch (error) {
-    console.error('Error releasing document URL:', error);
   }
 };
