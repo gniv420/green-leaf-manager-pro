@@ -224,8 +224,8 @@ class ClubDatabase extends Dexie {
       if (importData.cashTransactions) await this.cashTransactions.clear();
       if (importData.memberTransactions) await this.memberTransactions.clear();
       
-      // Import all data
-      await this.transaction('rw', 
+      // Import all data - FIX: Use an array for transaction tables instead of individual parameters
+      await this.transaction('rw', [
         this.members, 
         this.users, 
         this.documents, 
@@ -233,8 +233,8 @@ class ClubDatabase extends Dexie {
         this.dispensary, 
         this.cashRegisters, 
         this.cashTransactions, 
-        this.memberTransactions, 
-        async () => {
+        this.memberTransactions
+      ], async () => {
           
         // Import members
         for (const member of importData.members) {
