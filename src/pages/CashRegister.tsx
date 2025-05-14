@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useSqliteQuery } from '@/hooks/useSqliteQuery';
 import { db, CashRegister, CashTransaction } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CircleDollarSign, DollarSign, Coins } from 'lucide-react';
@@ -51,49 +51,49 @@ const CashRegisterPage = () => {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.isAdmin === true;
   
-  const currentCashRegister = useLiveQuery(() => {
-    return db.cashRegisters
-      .where('status')
-      .equals('open')
-      .first();
-  });
+  const [currentCashRegister, currentRegisterLoading, currentRegisterError] = useSqliteQuery(
+    async () => {
+      return await db.getOpenCashRegister();
+    },
+    []
+  );
   
-  const cashRegisterHistory = useLiveQuery(() => {
-    return db.cashRegisters
-      .orderBy('openedAt')
-      .reverse()
-      .toArray();
-  });
+  const [cashRegisterHistory, historyLoading, historyError] = useSqliteQuery(
+    async () => {
+      return await db.getCashRegisters();
+    },
+    []
+  );
   
-  const cashTransactions = useLiveQuery(async () => {
-    if (!currentCashRegister?.id) return [];
-    
-    return await db.cashTransactions
-      .where('cashRegisterId')
-      .equals(currentCashRegister.id)
-      .toArray();
-  }, [currentCashRegister?.id]);
+  const [cashTransactions, transactionsLoading, transactionsError] = useSqliteQuery(
+    async () => {
+      if (!currentCashRegister?.id) return [];
+      
+      return await db.getCashTransactions(currentCashRegister.id);
+    },
+    [currentCashRegister?.id]
+  );
   
-  const paymentMethodSummary = useLiveQuery(async () => {
-    if (!currentCashRegister?.id) return null;
-    
-    const transactions = await db.cashTransactions
-      .where('cashRegisterId')
-      .equals(currentCashRegister.id)
-      .toArray();
-    
-    return {
-      cash: transactions
-        .filter(t => t.type === 'income' && t.paymentMethod === 'cash')
-        .reduce((sum, t) => sum + t.amount, 0),
-      bizum: transactions
-        .filter(t => t.type === 'income' && t.paymentMethod === 'bizum')
-        .reduce((sum, t) => sum + t.amount, 0),
-      wallet: transactions
-        .filter(t => t.type === 'income' && t.paymentMethod === 'wallet')
-        .reduce((sum, t) => sum + t.amount, 0)
-    };
-  }, [currentCashRegister?.id]);
+  const [paymentMethodSummary, summaryLoading, summaryError] = useSqliteQuery(
+    async () => {
+      if (!currentCashRegister?.id) return null;
+      
+      const transactions = await db.getCashTransactions(currentCashRegister.id);
+      
+      return {
+        cash: transactions
+          .filter(t => t.type === 'income' && t.paymentMethod === 'cash')
+          .reduce((sum, t) => sum + t.amount, 0),
+        bizum: transactions
+          .filter(t => t.type === 'income' && t.paymentMethod === 'bizum')
+          .reduce((sum, t) => sum + t.amount, 0),
+        wallet: transactions
+          .filter(t => t.type === 'income' && t.paymentMethod === 'wallet')
+          .reduce((sum, t) => sum + t.amount, 0)
+      };
+    },
+    [currentCashRegister?.id]
+  );
   
   const currentBalance = cashTransactions?.reduce((total, transaction) => {
     return total + (transaction.type === 'income' ? transaction.amount : -transaction.amount);
@@ -112,15 +112,17 @@ const CashRegisterPage = () => {
     try {
       const userId = currentUser?.id || 1; // Default to admin if not set
       
-      await db.cashRegisters.add({
-        openDate: new Date(),
+      await db.addCashRegister({
+        openDate: new Date().toISOString(),
+        closeDate: null,
         initialBalance: openingAmount,
+        finalBalance: null,
+        status: 'open',
         openingAmount,
         closingAmount: null,
         userId,
-        status: 'open',
         notes,
-        openedAt: new Date(),
+        openedAt: new Date().toISOString(),
         closedAt: null
       });
       
@@ -132,6 +134,9 @@ const CashRegisterPage = () => {
       setOpeningAmount(0);
       setNotes('');
       setIsOpenDialogOpen(false);
+      
+      // Force refetch of cash register data
+      window.location.reload();
       
     } catch (error) {
       console.error('Error al abrir caja:', error);
@@ -147,11 +152,13 @@ const CashRegisterPage = () => {
     if (!currentCashRegister?.id) return;
     
     try {
-      await db.cashRegisters.update(currentCashRegister.id, {
+      await db.updateCashRegister(currentCashRegister.id, {
         closingAmount,
         status: 'closed',
-        closedAt: new Date(),
-        notes: currentCashRegister.notes + '\n\nCIERRE: ' + notes
+        closedAt: new Date().toISOString(),
+        notes: currentCashRegister.notes + '\n\nCIERRE: ' + notes,
+        closeDate: new Date().toISOString(),
+        finalBalance: closingAmount
       });
       
       toast({
@@ -162,6 +169,9 @@ const CashRegisterPage = () => {
       setClosingAmount(0);
       setNotes('');
       setIsCloseDialogOpen(false);
+      
+      // Force refetch of cash register data
+      window.location.reload();
       
     } catch (error) {
       console.error('Error al cerrar caja:', error);
@@ -193,15 +203,14 @@ const CashRegisterPage = () => {
     }
 
     try {
-      await db.cashTransactions.add({
+      await db.addCashTransaction({
         type: transactionType,
         amount: transactionAmount,
         concept: transactionConcept,
         notes: transactionNotes,
         paymentMethod: paymentMethod,
         userId: currentUser?.id || 1,
-        cashRegisterId: currentCashRegister.id,
-        createdAt: new Date()
+        cashRegisterId: currentCashRegister.id
       });
 
       toast({
@@ -213,6 +222,9 @@ const CashRegisterPage = () => {
       setTransactionConcept('');
       setTransactionNotes('');
       setIsAddTransactionDialogOpen(false);
+      
+      // Force refetch of cash transactions
+      window.location.reload();
     } catch (error) {
       console.error('Error al añadir transacción:', error);
       toast({
@@ -410,10 +422,9 @@ const CashRegisterPage = () => {
                     </TableCell>
                     <TableCell>{transaction.concept}</TableCell>
                     <TableCell>
-                      {(transaction as any).paymentMethod === 'cash' && 'Efectivo'}
-                      {(transaction as any).paymentMethod === 'bizum' && 'Bizum'}
-                      {(transaction as any).paymentMethod === 'wallet' && 'Monedero'}
-                      {!(transaction as any).paymentMethod && 'Efectivo'}
+                      {transaction.paymentMethod === 'cash' && 'Efectivo'}
+                      {transaction.paymentMethod === 'bizum' && 'Bizum'}
+                      {transaction.paymentMethod === 'wallet' && 'Monedero'}
                     </TableCell>
                     <TableCell className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
                       {transaction.type === 'income' ? '+' : '-'}{transaction.amount.toFixed(2)}€

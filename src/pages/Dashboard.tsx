@@ -1,128 +1,113 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSqliteQuery } from '@/hooks/useSqliteQuery';
+import { db } from '@/lib/sqlite-db';
 
 const Dashboard = () => {
-  // Consulta para obtener datos de miembros activos
-  const [members, membersLoading, membersError] = useSqliteQuery(
-    "SELECT * FROM members WHERE status = 'active'"
+  const [members, membersLoading] = useSqliteQuery(
+    async () => {
+      return await db.getMembers();
+    },
+    []
   );
 
-  // Consulta para obtener datos de dispensario
-  const [dispensary, dispensaryLoading, dispensaryError] = useSqliteQuery(
-    "SELECT * FROM dispensary ORDER BY createdAt DESC LIMIT 10"
+  const [products, productsLoading] = useSqliteQuery(
+    async () => {
+      return await db.getProducts();
+    }, 
+    []
   );
 
-  // Consulta para obtener datos de productos
-  const [products, productsLoading, productsError] = useSqliteQuery(
-    "SELECT * FROM products WHERE stockGrams < 20"
+  const [recentDispensations, dispensationsLoading] = useSqliteQuery(
+    async () => {
+      return await db.getRecentDispensations(5);
+    },
+    []
   );
-
-  // Datos de ejemplo para el gráfico
-  const chartData = [
-    { name: 'Ene', ventas: 400 },
-    { name: 'Feb', ventas: 600 },
-    { name: 'Mar', ventas: 500 },
-    { name: 'Abr', ventas: 700 },
-    { name: 'May', ventas: 900 },
-    { name: 'Jun', ventas: 800 },
-  ];
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">Panel de Control</h1>
+    <div className="container mx-auto py-6 space-y-6">
+      <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Gráfico de ventas */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Ventas Mensuales</h2>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Socios Activos</CardTitle>
           </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="ventas" stroke="#10b981" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {membersLoading ? '...' : members?.filter(m => m.status === 'active').length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {membersLoading ? '...' : `De un total de ${members?.length || 0} socios`}
+            </p>
           </CardContent>
         </Card>
         
-        {/* Miembros activos */}
         <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Miembros Activos</h2>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Productos en Stock</CardTitle>
           </CardHeader>
           <CardContent>
-            {membersLoading ? (
-              <p>Cargando...</p>
-            ) : membersError ? (
-              <p className="text-red-500">Error: {membersError.message}</p>
-            ) : (
-              <div>
-                <p className="text-3xl font-bold">{Array.isArray(members) ? members.length : 0}</p>
-                <ul className="mt-4 space-y-2">
-                  {Array.isArray(members) && members.slice(0, 5).map((member) => (
-                    <li key={member.id} className="text-sm">
-                      {member.firstName} {member.lastName}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div className="text-2xl font-bold">
+              {productsLoading ? '...' : products?.filter(p => p.stockGrams > 0).length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {productsLoading ? '...' : `De un total de ${products?.length || 0} productos`}
+            </p>
           </CardContent>
         </Card>
         
-        {/* Dispensaciones recientes */}
         <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Dispensaciones Recientes</h2>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Gramos en Stock</CardTitle>
           </CardHeader>
           <CardContent>
-            {dispensaryLoading ? (
-              <p>Cargando...</p>
-            ) : dispensaryError ? (
-              <p className="text-red-500">Error: {dispensaryError.message}</p>
-            ) : (
-              <ul className="space-y-2">
-                {Array.isArray(dispensary) && dispensary.slice(0, 5).map((item) => (
-                  <li key={item.id} className="text-sm border-b pb-1">
-                    <span className="font-medium">ID: {item.memberId}</span> - 
-                    {item.quantity}g - €{item.price.toFixed(2)}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-        
-        {/* Productos con stock bajo */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Productos con Stock Bajo</h2>
-          </CardHeader>
-          <CardContent>
-            {productsLoading ? (
-              <p>Cargando...</p>
-            ) : productsError ? (
-              <p className="text-red-500">Error: {productsError.message}</p>
-            ) : (
-              <ul className="space-y-2">
-                {Array.isArray(products) && products.map((product) => (
-                  <li key={product.id} className="text-sm border-b pb-1">
-                    <span className="font-medium">{product.name}</span> - 
-                    Stock: {product.stockGrams}g
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="text-2xl font-bold">
+              {productsLoading 
+                ? '...' 
+                : products?.reduce((acc, product) => acc + product.stockGrams, 0).toFixed(2) || 0}g
+            </div>
           </CardContent>
         </Card>
       </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Dispensaciones Recientes</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="space-y-8">
+            {dispensationsLoading ? (
+              <p className="text-center p-4">Cargando dispensaciones...</p>
+            ) : recentDispensations?.length === 0 ? (
+              <p className="text-center p-4">No hay dispensaciones recientes</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-4">Socio</th>
+                    <th className="text-left p-4">Producto</th>
+                    <th className="text-left p-4">Cantidad</th>
+                    <th className="text-right p-4">Precio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentDispensations?.map((dispensation) => (
+                    <tr key={dispensation.id} className="border-b">
+                      <td className="p-4">{dispensation.firstName} {dispensation.lastName}</td>
+                      <td className="p-4">{dispensation.productName}</td>
+                      <td className="p-4">{dispensation.quantity}g</td>
+                      <td className="text-right p-4">{dispensation.price.toFixed(2)}€</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
