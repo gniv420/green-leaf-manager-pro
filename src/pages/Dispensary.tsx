@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
-import { db, Dispensary as DispensaryRecord, Member, Product } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useSqliteQuery } from '@/hooks/useSqliteQuery';
+import { db } from '@/lib/sqlite-db';
+import { useDispensaryHistory } from '@/hooks/use-dispensary-history';
 import { 
   Cannabis, 
   Plus, 
@@ -90,87 +91,93 @@ const Dispensary = () => {
   const [actualGrams, setActualGrams] = useState<number>(0);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const { toast } = useToast();
-
-  const dispensaryRecords = useLiveQuery(
+  
+  // Usar nuestro hook personalizado para las consultas SQLite
+  const [dispensaryRecords, dispensaryLoading, dispensaryError] = useSqliteQuery(
     async () => {
-      const allRecords = await db.dispensary.toArray();
-      // Obtener todos los miembros y productos para mostrar sus nombres
-      const members = await db.members.toArray();
-      const products = await db.products.toArray();
+      const allRecords = await db.getDispensaryRecords();
+      const members = await db.getMembers();
+      const products = await db.getProducts();
       
-      const recordsWithDetails = await Promise.all(
-        allRecords.map(async (record) => {
-          const member = members.find(m => m.id === record.memberId);
-          const product = products.find(p => p.id === record.productId);
-          
-          return {
-            ...record,
-            memberName: member ? `${member.firstName} ${member.lastName}` : 'Desconocido',
-            memberCode: member?.memberCode || '',
-            productName: product ? product.name : 'Desconocido',
-          };
-        })
-      );
+      const recordsWithDetails = allRecords.map(record => {
+        const member = members.find(m => m.id === record.memberId);
+        const product = products.find(p => p.id === record.productId);
+        
+        return {
+          ...record,
+          memberName: member ? `${member.firstName} ${member.lastName}` : 'Desconocido',
+          memberCode: member?.memberCode || '',
+          productName: product ? product.name : 'Desconocido',
+        };
+      });
       
       if (searchQuery) {
         const lowerQuery = searchQuery.toLowerCase();
         return recordsWithDetails.filter(
           record => 
-            record.memberName.toLowerCase().includes(lowerQuery) || 
-            record.memberCode.toLowerCase().includes(lowerQuery) ||
-            record.productName.toLowerCase().includes(lowerQuery)
+            (record.memberName && record.memberName.toLowerCase().includes(lowerQuery)) || 
+            (record.memberCode && record.memberCode.toLowerCase().includes(lowerQuery)) ||
+            (record.productName && record.productName.toLowerCase().includes(lowerQuery))
         );
       }
       
-      return recordsWithDetails.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      // Ordenar por fecha descendente
+      return recordsWithDetails.sort((a, b) => {
+        const dateA = new Date(a.createdAt);
+        const dateB = new Date(b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
     },
     [searchQuery]
   );
 
-  const members = useLiveQuery(
-    () => {
+  const [members, membersLoading, membersError] = useSqliteQuery(
+    async () => {
+      const allMembers = await db.getMembers();
+      
       if (!memberSearchQuery) {
-        return db.members.toArray();
+        return allMembers;
       }
       
       const query = memberSearchQuery.toLowerCase();
-      return db.members
-        .filter(member => 
-          member.firstName.toLowerCase().includes(query) ||
-          member.lastName.toLowerCase().includes(query) ||
-          member.memberCode.toLowerCase().includes(query) ||
-          (member.rfidCode && member.rfidCode.toLowerCase().includes(query)) ||
-          member.dni.toLowerCase().includes(query)
-        )
-        .toArray();
+      return allMembers.filter(member => 
+        member.firstName.toLowerCase().includes(query) ||
+        member.lastName.toLowerCase().includes(query) ||
+        member.memberCode.toLowerCase().includes(query) ||
+        (member.rfidCode && member.rfidCode.toLowerCase().includes(query)) ||
+        member.dni.toLowerCase().includes(query)
+      );
     },
     [memberSearchQuery]
   );
   
-  // Normalize product data to ensure numeric values
-  const products = useLiveQuery(async () => {
-    const allProducts = await db.products.toArray();
-    
-    // Ensure all products have proper number values for numeric fields
-    return allProducts.map(product => ({
-      ...product,
-      price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
-      stockGrams: typeof product.stockGrams === 'number' ? product.stockGrams : Number(product.stockGrams) || 0
-    }));
-  });
+  // Consulta de productos
+  const [products, productsLoading, productsError] = useSqliteQuery(
+    async () => {
+      const allProducts = await db.getProducts();
+      
+      // Normalizar valores numéricos
+      return allProducts.map(product => ({
+        ...product,
+        price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
+        stockGrams: typeof product.stockGrams === 'number' ? product.stockGrams : Number(product.stockGrams) || 0
+      }));
+    },
+    []
+  );
 
   // Productos filtrados por búsqueda
   const filteredProducts = products?.filter(product => 
     product.name.toLowerCase().includes(productSearchQuery.toLowerCase())
   );
   
-  // Obtenemos el registro de caja abierta para validar
-  const currentCashRegister = useLiveQuery(() => {
-    return db.cashRegisters
-      .where('status')
-      .equals('open')
-      .first();
-  });
+  // Obtener el registro de caja abierta
+  const [currentCashRegister, cashRegisterLoading, cashRegisterError] = useSqliteQuery(
+    async () => {
+      return db.getOpenCashRegister();
+    },
+    []
+  );
 
   type FormValues = {
     memberId: string;
@@ -241,7 +248,7 @@ const Dispensary = () => {
   }, [cart, desiredPrice, form]);
 
   // Añadir producto al carrito
-  const addToCart = (product: Product) => {
+  const addToCart = (product: any) => {
     // Clear the cart first to ensure only one product is selected
     setCart([{
       productId: product.id!,
@@ -283,7 +290,7 @@ const Dispensary = () => {
   };
 
   // Seleccionar un miembro
-  const selectMember = (member: Member) => {
+  const selectMember = (member: any) => {
     if (member.id) {
       form.setValue('memberId', member.id.toString());
       setSelectedMemberId(member.id.toString());
@@ -304,7 +311,9 @@ const Dispensary = () => {
     
     try {
       // Obtener la dispensación a eliminar
-      const dispensaryToRevert = await db.dispensary.get(dispensaryToDelete);
+      const dispensaryRecords = await db.getDispensaryRecords();
+      const dispensaryToRevert = dispensaryRecords.find(d => d.id === dispensaryToDelete);
+      
       if (!dispensaryToRevert) {
         toast({
           variant: 'destructive',
@@ -315,33 +324,33 @@ const Dispensary = () => {
       }
       
       // Revertir el stock
-      const product = await db.products.get(dispensaryToRevert.productId);
+      const product = await db.getProductById(dispensaryToRevert.productId);
       if (product) {
         const newStockGrams = Number(product.stockGrams) + Number(dispensaryToRevert.quantity);
-        await db.products.update(product.id!, { 
+        await db.updateProduct(product.id!, { 
           stockGrams: newStockGrams,
-          updatedAt: new Date()
+          updatedAt: new Date().toISOString()
         });
       }
       
       // Si el método de pago era en efectivo o Bizum, registrar una salida de caja
       if (dispensaryToRevert.paymentMethod === 'cash' || dispensaryToRevert.paymentMethod === 'bizum') {
         if (currentCashRegister) {
-          await db.cashTransactions.add({
+          await db.addCashTransaction({
             type: 'expense',
             amount: dispensaryToRevert.price,
             concept: `Devolución por dispensación eliminada`,
             notes: `ID dispensación: ${dispensaryToRevert.id}`,
             userId: 1, // Admin por defecto
             paymentMethod: dispensaryToRevert.paymentMethod,
-            cashRegisterId: currentCashRegister.id,
-            createdAt: new Date()
+            cashRegisterId: currentCashRegister.id
           });
         }
       }
       
-      // Eliminar la dispensación
-      await db.dispensary.delete(dispensaryToDelete);
+      // Eliminar la dispensación (usar método apropiado en SQLite)
+      // Aquí tendríamos que implementar el método de eliminación en sqlite-db.ts
+      await db.deleteDispensary(dispensaryToDelete);
       
       toast({
         title: 'Dispensación eliminada',
@@ -349,7 +358,7 @@ const Dispensary = () => {
       });
       
     } catch (error) {
-      console.error('Error al eliminar dispensaci��n:', error);
+      console.error('Error al eliminar dispensación:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -389,7 +398,7 @@ const Dispensary = () => {
       const paymentMethod = data.paymentMethod;
       
       // Obtener el producto para verificar stock y precio
-      const product = await db.products.get(productId);
+      const product = await db.getProductById(productId);
       
       if (!product) {
         toast({
@@ -417,58 +426,55 @@ const Dispensary = () => {
       const price = data.desiredPrice;
       
       // Registrar dispensación
-      const dispensaryId = await db.dispensary.add({
+      const dispensaryId = await db.addDispensaryRecord({
         memberId,
         productId,
         quantity: actualGrams,
         price,
         paymentMethod,
         notes: `Cantidad deseada: ${data.desiredPrice}€, Calculada: ${data.calculatedGrams}g, Dispensada: ${data.actualGrams}g`,
-        userId: 1, // Admin por defecto
-        createdAt: new Date()
+        userId: 1 // Admin por defecto
       });
       
       // Actualizar stock del producto
-      await db.products.update(productId, {
+      await db.updateProduct(productId, {
         stockGrams: stockGramsNum - actualGrams,
-        updatedAt: new Date()
+        updatedAt: new Date().toISOString()
       });
       
       // Si el método de pago es monedero, actualizar el saldo del socio
       if (paymentMethod === 'wallet') {
         // Obtener socio actual
-        const member = await db.members.get(memberId);
+        const member = await db.getMemberById(memberId);
         if (member) {
           // Actualizar saldo (puede quedar negativo)
           const currentBalance = member.balance || 0;
           const newBalance = currentBalance - price;
           
-          await db.members.update(memberId, {
+          await db.updateMember(memberId, {
             balance: newBalance,
-            updatedAt: new Date()
+            updatedAt: new Date().toISOString()
           });
           
           // Registrar la transacción del socio
-          await db.memberTransactions.add({
+          await db.addMemberTransaction({
             memberId,
             amount: -price,  // Negativo porque es una salida
             type: 'withdrawal',
             notes: `Dispensación de ${product.name}`,
-            userId: 1, // Admin por defecto
-            createdAt: new Date()
+            userId: 1 // Admin por defecto
           });
         }
       } else {
         // Registrar el pago en caja solo si es efectivo o bizum
-        await db.cashTransactions.add({
+        await db.addCashTransaction({
           type: 'income',
           amount: price,
           concept: `Dispensación de ${product.name}`,
           notes: `Para socio ID: ${memberId}`,
           userId: 1, // Admin por defecto
           paymentMethod,
-          cashRegisterId: currentCashRegister.id,
-          createdAt: new Date()
+          cashRegisterId: currentCashRegister.id
         });
       }
       
@@ -504,10 +510,10 @@ const Dispensary = () => {
   };
 
   // Obtener el miembro seleccionado
-  const selectedMember = useLiveQuery(
-    () => {
+  const [selectedMember, selectedMemberLoading, selectedMemberError] = useSqliteQuery(
+    async () => {
       if (!selectedMemberId) return null;
-      return db.members.get(parseInt(selectedMemberId));
+      return db.getMemberById(parseInt(selectedMemberId));
     },
     [selectedMemberId]
   );

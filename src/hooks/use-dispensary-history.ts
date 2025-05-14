@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/db';
+import { db } from '@/lib/sqlite-db';
 
 interface DispensaryRecord {
   id?: number;
@@ -11,7 +11,7 @@ interface DispensaryRecord {
   paymentMethod: 'cash' | 'bizum' | 'wallet';
   notes?: string;
   userId: number;
-  createdAt: Date;
+  createdAt: string;
   productName?: string;
 }
 
@@ -32,15 +32,11 @@ export function useDispensaryHistory(memberId?: number) {
     const fetchRecords = async () => {
       try {
         setLoading(true);
-        // Obtener registros de dispensario
-        const dispensaryRecords = await db.dispensary
-          .where('memberId')
-          .equals(memberId)
-          .reverse()
-          .sortBy('createdAt');
+        // Obtener registros de dispensario desde SQLite
+        const dispensaryRecords = await db.getDispensaryForMember(memberId);
         
         // Obtener información de productos
-        const products = await db.products.toArray();
+        const products = await db.getProducts();
         
         // Combinar datos
         const enrichedRecords = dispensaryRecords.map(record => {
@@ -51,11 +47,18 @@ export function useDispensaryHistory(memberId?: number) {
           };
         });
 
+        // Ordenar por fecha descendente
+        const sortedRecords = enrichedRecords.sort((a, b) => {
+          const dateA = new Date(a.createdAt);
+          const dateB = new Date(b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
+
         // Calcular totales
-        const dispensedTotal = enrichedRecords.reduce((sum, record) => sum + (record.quantity || 0), 0);
-        const spentTotal = enrichedRecords.reduce((sum, record) => sum + (record.price || 0), 0);
+        const dispensedTotal = sortedRecords.reduce((sum, record) => sum + (Number(record.quantity) || 0), 0);
+        const spentTotal = sortedRecords.reduce((sum, record) => sum + (Number(record.price) || 0), 0);
         
-        setRecords(enrichedRecords);
+        setRecords(sortedRecords);
         setTotalDispensed(dispensedTotal);
         setTotalSpent(spentTotal);
       } catch (err) {

@@ -1,4 +1,3 @@
-
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import fs from 'fs';
@@ -858,6 +857,12 @@ class SQLiteDB {
       console.error('Error importing data:', error);
       throw new Error('Error al importar los datos');
     }
+  }
+
+  // Método para eliminar una dispensación
+  async deleteDispensary(id: number): Promise<void> {
+    const db = await dbPromise;
+    await db.run('DELETE FROM dispensary WHERE id = ?', id);
   }
 }
 
