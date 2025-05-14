@@ -1,53 +1,29 @@
 
-// Helper function to open document URLs
-export const openDocument = (document: { data: ArrayBuffer | string, contentType: string }) => {
-  console.log("openDocument called with document:", document ? "Document exists" : "Document is null/undefined");
-  
-  if (!document || !document.data) {
-    console.error("Invalid document: document or document.data is null/undefined");
-    return null;
-  }
-  
+export const openDocument = (doc: { data: Buffer | ArrayBuffer, contentType: string }): string => {
   try {
-    // Log document content type
-    console.log("Document content type:", document.contentType);
-    
-    // Convert ArrayBuffer or string to Blob
+    // Convertir el ArrayBuffer o Buffer a Blob
     let blob;
-    if (document.data instanceof ArrayBuffer) {
-      console.log("Document data is ArrayBuffer, size:", document.data.byteLength);
-      blob = new Blob([document.data], { type: document.contentType || 'application/octet-stream' });
-    } else if (typeof document.data === 'string') {
-      console.log("Document data is string, length:", document.data.length);
-      blob = new Blob([document.data], { type: document.contentType || 'application/octet-stream' });
+    if (doc.data instanceof ArrayBuffer) {
+      blob = new Blob([doc.data], { type: doc.contentType });
     } else {
-      console.error("Invalid document data format:", typeof document.data);
-      return null;
+      // Convertir Buffer a ArrayBuffer primero si es necesario
+      const arrayBuffer = new Uint8Array(doc.data).buffer;
+      blob = new Blob([arrayBuffer], { type: doc.contentType });
     }
     
-    // Create a URL for the blob
+    // Crear URL para el blob
     const url = URL.createObjectURL(blob);
-    console.log("Document URL created successfully:", url);
     return url;
   } catch (error) {
-    console.error("Error creating document URL:", error);
-    return null;
+    console.error('Error opening document:', error);
+    return '';
   }
 };
 
-// Helper function to clean up URLs
-export const releaseDocumentUrl = (url: string) => {
-  console.log("Releasing document URL:", url);
-  
-  if (!url) {
-    console.warn("Attempting to release an empty document URL");
-    return;
-  }
-  
+export const releaseDocumentUrl = (url: string): void => {
   try {
     URL.revokeObjectURL(url);
-    console.log("Document URL released successfully:", url);
   } catch (error) {
-    console.error("Error releasing document URL:", error);
+    console.error('Error releasing document URL:', error);
   }
 };

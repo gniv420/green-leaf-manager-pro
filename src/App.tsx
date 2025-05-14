@@ -21,22 +21,8 @@ import Users from "@/pages/Users";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 
-// Initialize the database schema for RFID
-import { db } from '@/lib/db';
-
+// Ya no se necesita inicializar Dexie
 import './App.css';
-
-// Make sure the schema is updated
-db.version(db.verno + 1).stores({
-  members: '++id, memberCode, dni, firstName, lastName, rfidCode, createdAt'
-}).upgrade(tx => {
-  // Add rfidCode to existing members
-  return tx.table('members').toCollection().modify(member => {
-    if (!member.rfidCode) {
-      member.rfidCode = '';
-    }
-  });
-});
 
 function App() {
   return (
