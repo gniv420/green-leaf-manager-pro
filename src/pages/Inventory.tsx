@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, Product } from '@/lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { Product } from '@/lib/sqlite-db';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +47,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Edit, Plus, Trash2, AlertTriangle, Eye, EyeOff, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/lib/sqlite-db';
+import { useSqliteQuery } from '@/hooks/useSqliteQuery';
 
 const Inventory = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,28 +58,26 @@ const Inventory = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
 
-  const products = useLiveQuery(
+  // Use our custom useSqliteQuery hook instead of useLiveQuery
+  const [products, isLoading, error] = useSqliteQuery<Product[]>(
     async () => {
-      const allProducts = await db.products.toArray();
-      
-      // Ensure all products have proper number values for numeric fields
-      const normalizedProducts = allProducts.map(product => ({
-        ...product,
-        price: typeof product.price === 'number' ? product.price : Number(product.price) || 0,
-        costPrice: typeof product.costPrice === 'number' ? product.costPrice : Number(product.costPrice) || 0,
-        stockGrams: typeof product.stockGrams === 'number' ? product.stockGrams : Number(product.stockGrams) || 0,
-        isVisible: product.isVisible !== false // Default to true if not set
-      }));
-      
-      if (searchQuery) {
-        const lowerQuery = searchQuery.toLowerCase();
-        return normalizedProducts.filter(
-          product => 
-            product.name.toLowerCase().includes(lowerQuery) || 
-            product.category.toLowerCase().includes(lowerQuery)
-        );
+      try {
+        const allProducts = await db.getProducts();
+        
+        // Apply search filter if search query exists
+        if (searchQuery) {
+          const lowerQuery = searchQuery.toLowerCase();
+          return allProducts.filter(
+            product => 
+              product.name.toLowerCase().includes(lowerQuery) || 
+              product.category.toLowerCase().includes(lowerQuery)
+          );
+        }
+        return allProducts;
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        throw error;
       }
-      return normalizedProducts;
     },
     [searchQuery]
   );
@@ -88,6 +87,7 @@ const Inventory = () => {
       name: '',
       category: '',
       description: '',
+      type: 'other',
       costPrice: 0,
       price: 0,
       stockGrams: 0,
@@ -100,7 +100,8 @@ const Inventory = () => {
       form.reset({
         name: editingProduct.name,
         category: editingProduct.category,
-        description: editingProduct.description,
+        description: editingProduct.description || '',
+        type: editingProduct.type || 'other',
         costPrice: editingProduct.costPrice || 0,
         price: editingProduct.price,
         stockGrams: editingProduct.stockGrams,
@@ -111,6 +112,7 @@ const Inventory = () => {
         name: '',
         category: '',
         description: '',
+        type: 'other',
         costPrice: 0,
         price: 0,
         stockGrams: 0,
@@ -133,7 +135,7 @@ const Inventory = () => {
     if (!id) return;
     
     try {
-      await db.products.delete(id);
+      await db.deleteProduct(id);
       toast({
         title: "Producto eliminado",
         description: "El producto ha sido eliminado correctamente",
@@ -153,7 +155,7 @@ const Inventory = () => {
 
     try {
       const newVisibility = !product.isVisible;
-      await db.products.update(product.id, {
+      await db.updateProduct(product.id, {
         isVisible: newVisibility
       });
 
@@ -182,20 +184,13 @@ const Inventory = () => {
       };
       
       if (editingProduct?.id) {
-        await db.products.update(editingProduct.id, {
-          ...productData,
-          updatedAt: new Date()
-        });
+        await db.updateProduct(editingProduct.id, productData);
         toast({
           title: "Producto actualizado",
           description: "El producto ha sido actualizado correctamente",
         });
       } else {
-        await db.products.add({
-          ...productData,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
+        await db.addProduct(productData);
         toast({
           title: "Producto añadido",
           description: "El nuevo producto ha sido añadido correctamente",
@@ -220,6 +215,16 @@ const Inventory = () => {
     const num = typeof value === 'number' ? value : Number(value);
     return isNaN(num) ? '0.00' : num.toFixed(2);
   };
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-6 space-y-6">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <p>Error al cargar los productos: {error.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -264,58 +269,68 @@ const Inventory = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products?.length === 0 && (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">
+                      <div className="flex justify-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+                      </div>
+                      <div className="mt-2">Cargando productos...</div>
+                    </TableCell>
+                  </TableRow>
+                ) : products && products.length > 0 ? (
+                  products.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>{product.category}</TableCell>
+                      <TableCell>{formatNumber(product.price)}€</TableCell>
+                      <TableCell>
+                        <span className={product.stockGrams < 10 ? "text-destructive font-medium" : ""}>
+                          {formatNumber(product.stockGrams)}g
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {product.isVisible !== false ? 
+                          <span className="text-green-500">Visible</span> : 
+                          <span className="text-red-500">Oculto</span>
+                        }
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell>{formatNumber(product.costPrice || 0)}€</TableCell>
+                      )}
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={() => toggleProductVisibility(product)}
+                          >
+                            {product.isVisible !== false ? 
+                              <EyeOff className="h-4 w-4" /> : 
+                              <Eye className="h-4 w-4" />
+                            }
+                          </Button>
+                          {isAdmin && (
+                            <>
+                              <Button size="sm" variant="ghost" onClick={() => handleOpenEditDialog(product)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(product.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
                     <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">
                       No hay productos registrados.
                     </TableCell>
                   </TableRow>
                 )}
-                {products?.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.category}</TableCell>
-                    <TableCell>{formatNumber(product.price)}€</TableCell>
-                    <TableCell>
-                      <span className={product.stockGrams < 10 ? "text-destructive font-medium" : ""}>
-                        {formatNumber(product.stockGrams)}g
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {product.isVisible !== false ? 
-                        <span className="text-green-500">Visible</span> : 
-                        <span className="text-red-500">Oculto</span>
-                      }
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell>{formatNumber(product.costPrice || 0)}€</TableCell>
-                    )}
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => toggleProductVisibility(product)}
-                        >
-                          {product.isVisible !== false ? 
-                            <EyeOff className="h-4 w-4" /> : 
-                            <Eye className="h-4 w-4" />
-                          }
-                        </Button>
-                        {isAdmin && (
-                          <>
-                            <Button size="sm" variant="ghost" onClick={() => handleOpenEditDialog(product)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(product.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
               </TableBody>
             </Table>
           </div>
@@ -351,6 +366,29 @@ const Inventory = () => {
                     <FormControl>
                       <Input {...field} placeholder="Flor, Extracto, etc." />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona tipo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="sativa">Sativa</SelectItem>
+                        <SelectItem value="indica">Indica</SelectItem>
+                        <SelectItem value="hibrido">Híbrido</SelectItem>
+                        <SelectItem value="other">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { db, CashRegister } from '@/lib/db';
+import { CashRegister } from '@/lib/sqlite-db';
+import { db } from '@/lib/sqlite-db';
 
 export function useCurrentCashRegister() {
   const [cashRegister, setCashRegister] = useState<CashRegister | null>(null);
@@ -11,10 +12,7 @@ export function useCurrentCashRegister() {
     const fetchCashRegister = async () => {
       try {
         setLoading(true);
-        const openRegister = await db.cashRegisters
-          .where('status')
-          .equals('open')
-          .first();
+        const openRegister = await db.getOpenCashRegister();
         setCashRegister(openRegister || null);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Error loading cash register'));
