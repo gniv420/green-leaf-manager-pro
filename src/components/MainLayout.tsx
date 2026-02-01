@@ -18,8 +18,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { 
-  Cannabis, 
-  Users, 
+  Pizza, 
+  ShoppingCart, 
   BarChart4, 
   Settings, 
   Menu, 
@@ -27,7 +27,10 @@ import {
   Package2,
   User,
   FileBarChart,
-  LogOut
+  LogOut,
+  Receipt,
+  TrendingDown,
+  UserCircle
 } from "lucide-react";
 
 interface SidebarItem {
@@ -49,12 +52,6 @@ export const MainLayout = () => {
   useEffect(() => {
     console.log("MainLayout mounted/updated with path:", pathname);
     
-    // Parse the path to check if we're on a member details page
-    if (pathname.startsWith('/members/')) {
-      const memberId = pathname.split('/').pop();
-      console.log("On member details page for ID:", memberId);
-    }
-    
     return () => {
       console.log("MainLayout unmounting from path:", pathname);
     };
@@ -67,14 +64,24 @@ export const MainLayout = () => {
       path: "/dashboard",
     },
     {
-      title: "Socios",
-      icon: Users,
-      path: "/members",
+      title: "Ventas / TPV",
+      icon: ShoppingCart,
+      path: "/sales",
     },
     {
-      title: "Dispensario",
-      icon: Cannabis,
-      path: "/dispensary",
+      title: "Facturas",
+      icon: Receipt,
+      path: "/invoices",
+    },
+    {
+      title: "Productos",
+      icon: Pizza,
+      path: "/products",
+    },
+    {
+      title: "Gastos",
+      icon: TrendingDown,
+      path: "/expenses",
     },
     {
       title: "Caja",
@@ -82,10 +89,9 @@ export const MainLayout = () => {
       path: "/cash-register",
     },
     {
-      title: "Inventario",
-      icon: Package2,
-      path: "/inventory",
-      admin: true,
+      title: "Clientes",
+      icon: UserCircle,
+      path: "/customers",
     },
     {
       title: "Informes",
@@ -128,9 +134,9 @@ export const MainLayout = () => {
             {logoPreview ? (
               <img src={logoPreview} alt="Logo" className="h-8 w-8 object-contain" />
             ) : (
-              <Cannabis className="h-6 w-6 text-green-600" />
+              <Pizza className="h-6 w-6 text-orange-600" />
             )}
-            <span className="text-lg font-semibold truncate sidebar-name">{associationName}</span>
+            <span className="text-lg font-semibold truncate sidebar-name">{associationName || 'Pizzería'}</span>
           </div>
         </SidebarHeader>
         

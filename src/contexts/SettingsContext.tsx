@@ -16,8 +16,8 @@ interface SettingsContextType {
 }
 
 const defaultSettings = {
-  associationName: 'NivariaCSC Manager',
-  primaryColor: '#15803d', // Green color
+  associationName: 'Mi Pizzería',
+  primaryColor: '#ea580c', // Orange color
   logoUrl: '',
   logoPreview: '',
 };

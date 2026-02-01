@@ -1,253 +1,405 @@
-
 import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/db';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { DateRange } from 'react-day-picker';
-import { format, subDays } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/db';
+import type { Invoice, Expense } from '@/lib/db';
+import { FileBarChart, TrendingUp, TrendingDown, Calculator, Download } from 'lucide-react';
 
-// Tipo para los datos de transacciones
-type TransactionData = {
-  date: string;
-  income: number;
-  expense: number;
-  balance: number;
-};
+const Reports = () => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  const [salesReport, setSalesReport] = useState<any>(null);
+  const [expensesReport, setExpensesReport] = useState<any>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [bestProducts, setBestProducts] = useState<any[]>([]);
 
-export default function Reports() {
-  // Estado para rango de fechas (por defecto últimos 30 días)
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date(),
-  });
-  
-  // Estados para datos
-  const [transactionData, setTransactionData] = useState<TransactionData[]>([]);
-  const [productData, setProductData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  
-  // Cargar datos cuando cambie el rango de fechas
   useEffect(() => {
-    const loadReportData = async () => {
-      if (!dateRange?.from || !dateRange?.to) return;
-      
+    loadReports();
+  }, [startDate, endDate]);
+
+  const loadReports = async () => {
+    try {
       setLoading(true);
-      try {
-        // Obtener todas las transacciones
-        const cashRegisters = await db.getCashRegisters();
-        
-        // Filtrar por el rango de fechas seleccionado
-        const filteredRegisters = cashRegisters.filter(register => {
-          const registerDate = new Date(register.openDate);
-          return dateRange.from && dateRange.to && 
-            registerDate >= dateRange.from && 
-            registerDate <= dateRange.to;
-        });
-        
-        // Obtener transacciones para cada caja
-        const allTransactions = [];
-        for (const register of filteredRegisters) {
-          if (register.id) {
-            const transactions = await db.cashTransactions.where('cashRegisterId').equals(register.id).toArray();
-            allTransactions.push(...transactions);
-          }
-        }
-        
-        // Agrupar transacciones por fecha
-        const transactionsByDate = allTransactions.reduce((acc: Record<string, any>, transaction) => {
-          const date = format(new Date(transaction.createdAt), 'yyyy-MM-dd');
-          
-          if (!acc[date]) {
-            acc[date] = {
-              date,
-              income: 0,
-              expense: 0,
-              balance: 0
-            };
-          }
-          
-          if (transaction.type === 'income') {
-            acc[date].income += transaction.amount;
-          } else {
-            acc[date].expense += transaction.amount;
-          }
-          
-          acc[date].balance = acc[date].income - acc[date].expense;
-          
-          return acc;
-        }, {});
-        
-        // Convertir a array ordenado por fecha
-        const sortedTransactions = Object.values(transactionsByDate).sort((a: any, b: any) => 
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-        
-        setTransactionData(sortedTransactions as TransactionData[]);
-        
-        // Obtener datos de productos vendidos
-        const dispensaryRecords = await db.getDispensaryRecords();
-        const filteredDispensary = dispensaryRecords.filter(record => {
-          const recordDate = new Date(record.createdAt);
-          return dateRange.from && dateRange.to && 
-            recordDate >= dateRange.from && 
-            recordDate <= dateRange.to;
-        });
-        
-        // Agrupar por producto
-        const productSales: Record<number, { productId: number, name: string, quantity: number, revenue: number }> = {};
-        
-        for (const record of filteredDispensary) {
-          // Obtener detalles del producto
-          const product = await db.getProductById(record.productId);
-          
-          if (product) {
-            if (!productSales[record.productId]) {
-              productSales[record.productId] = {
-                productId: record.productId,
-                name: product.name,
-                quantity: 0,
-                revenue: 0
-              };
-            }
-            
-            productSales[record.productId].quantity += record.quantity;
-            productSales[record.productId].revenue += record.price;
-          }
-        }
-        
-        // Convertir a array y ordenar por cantidad vendida
-        const sortedProducts = Object.values(productSales).sort((a, b) => b.quantity - a.quantity);
-        
-        setProductData(sortedProducts);
-      } catch (error) {
-        console.error("Error loading report data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadReportData();
-  }, [dateRange]);
-  
-  // Formatear para el botón de selección de fechas
-  const formatDateRange = () => {
-    if (!dateRange?.from) {
-      return "Seleccionar fechas";
+      
+      // Cargar informes de ventas
+      const sales = await db.getSalesReport(startDate, endDate);
+      setSalesReport(sales);
+      
+      // Cargar informes de gastos
+      const exp = await db.getExpensesReport(startDate, endDate);
+      setExpensesReport(exp);
+      
+      // Cargar facturas del periodo
+      const inv = await db.getInvoicesByDateRange(startDate, endDate);
+      setInvoices(inv.filter(i => i.status !== 'anulada'));
+      
+      // Cargar gastos del periodo
+      const expenses = await db.getExpensesByDateRange(startDate, endDate);
+      setExpenses(expenses);
+      
+      // Cargar productos más vendidos
+      const products = await db.getBestSellingProducts(startDate, endDate, 10);
+      setBestProducts(products);
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading reports:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar los informes',
+        variant: 'destructive',
+      });
+      setLoading(false);
     }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR'
+    }).format(amount || 0);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-ES');
+  };
+
+  const calculateBalance = () => {
+    const totalSales = salesReport?.totalSales || 0;
+    const totalExpenses = expensesReport?.totalExpenses || 0;
+    return totalSales - totalExpenses;
+  };
+
+  const exportToCSV = (data: any[], filename: string) => {
+    const headers = Object.keys(data[0] || {}).join(',');
+    const rows = data.map(row => Object.values(row).join(','));
+    const csv = [headers, ...rows].join('\n');
     
-    if (dateRange.to) {
-      return `${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`;
-    }
-    
-    return format(dateRange.from, 'dd/MM/yyyy');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    a.click();
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Informes y Estadísticas</h1>
-      
-      <div className="mb-6">
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline">{formatDateRange()}</Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
-            <Calendar
-              initialFocus
-              mode="range"
-              defaultMonth={dateRange?.from}
-              selected={dateRange}
-              onSelect={(range) => {
-                setDateRange(range);
-                setCalendarOpen(false);
-              }}
-              locale={es}
-              numberOfMonths={2}
-            />
-          </PopoverContent>
-        </Popover>
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <FileBarChart className="h-8 w-8" />
+          Informes Contables
+        </h1>
       </div>
-      
-      {loading ? (
-        <div className="text-center py-8">Cargando datos...</div>
-      ) : (
-        <div className="space-y-8">
-          {/* Gráfico de transacciones */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Ingresos y Gastos</h2>
-            {transactionData.length > 0 ? (
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={transactionData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="date" 
-                      angle={-45} 
-                      textAnchor="end"
-                      tick={{ fontSize: 12 }}
-                      height={60}
-                    />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value: number) => `${value.toFixed(2)} €`}
-                    />
-                    <Legend />
-                    <Bar dataKey="income" name="Ingresos" fill="#4ade80" />
-                    <Bar dataKey="expense" name="Gastos" fill="#f87171" />
-                    <Bar dataKey="balance" name="Balance" fill="#60a5fa" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="text-center py-4 text-gray-500">No hay datos disponibles para este período</div>
-            )}
+
+      {/* Selector de fechas */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Periodo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4 items-end">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="startDate">Fecha Inicio</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="endDate">Fecha Fin</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+            <Button onClick={loadReports} disabled={loading}>
+              {loading ? 'Cargando...' : 'Actualizar'}
+            </Button>
           </div>
-          
-          {/* Productos más vendidos */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Productos Más Vendidos</h2>
-            {productData.length > 0 ? (
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={productData}
-                    layout="vertical"
-                    margin={{ top: 20, right: 30, left: 120, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      tick={{ fontSize: 12 }}
-                      width={100}
-                    />
-                    <Tooltip 
-                      formatter={(value: number, name: string) => {
-                        return name === "Cantidad" 
-                          ? `${value.toFixed(2)} g` 
-                          : `${value.toFixed(2)} €`;
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="quantity" name="Cantidad" fill="#8884d8" />
-                    <Bar dataKey="revenue" name="Ingresos" fill="#82ca9d" />
-                  </BarChart>
-                </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Resumen general */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {formatCurrency(salesReport?.totalSales || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {salesReport?.totalInvoices || 0} facturas
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Gastos</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {formatCurrency(expensesReport?.totalExpenses || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {expensesReport?.totalExpenses || 0} registros
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Balance</CardTitle>
+            <Calculator className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${calculateBalance() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {formatCurrency(calculateBalance())}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Resultado del periodo
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs para diferentes informes */}
+      <Tabs defaultValue="sales" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="sales">Libro de Ventas</TabsTrigger>
+          <TabsTrigger value="expenses">Libro de Compras</TabsTrigger>
+          <TabsTrigger value="igic">Resumen IGIC</TabsTrigger>
+          <TabsTrigger value="products">Productos Vendidos</TabsTrigger>
+        </TabsList>
+
+        {/* Libro de Ventas */}
+        <TabsContent value="sales">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Libro de Ventas</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportToCSV(invoices, 'libro-ventas')}
+                  disabled={invoices.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </Button>
               </div>
-            ) : (
-              <div className="text-center py-4 text-gray-500">No hay datos disponibles para este período</div>
-            )}
+            </CardHeader>
+            <CardContent className="p-0">
+              {invoices.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground">
+                  No hay ventas en este periodo
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Nº Factura</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead className="text-right">Base</TableHead>
+                      <TableHead className="text-right">IGIC</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell>{formatDate(invoice.date)}</TableCell>
+                        <TableCell className="font-mono text-sm">{invoice.invoiceNumber}</TableCell>
+                        <TableCell>{invoice.customerName || 'Cliente General'}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(invoice.subtotal)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(invoice.totalIgic)}</TableCell>
+                        <TableCell className="text-right font-semibold">{formatCurrency(invoice.total)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold bg-muted/50">
+                      <TableCell colSpan={3}>TOTAL</TableCell>
+                      <TableCell className="text-right">{formatCurrency(salesReport?.totalSubtotal || 0)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(salesReport?.totalIgic || 0)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(salesReport?.totalSales || 0)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Libro de Compras */}
+        <TabsContent value="expenses">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Libro de Compras y Gastos</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportToCSV(expenses, 'libro-compras')}
+                  disabled={expenses.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {expenses.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground">
+                  No hay gastos en este periodo
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Proveedor</TableHead>
+                      <TableHead>Concepto</TableHead>
+                      <TableHead className="text-right">Base</TableHead>
+                      <TableHead className="text-right">IGIC Soportado</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {expenses.map((expense) => (
+                      <TableRow key={expense.id}>
+                        <TableCell>{formatDate(expense.date)}</TableCell>
+                        <TableCell>{expense.supplier}</TableCell>
+                        <TableCell>{expense.concept}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(expense.subtotal)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(expense.igicAmount)}</TableCell>
+                        <TableCell className="text-right font-semibold">{formatCurrency(expense.total)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold bg-muted/50">
+                      <TableCell colSpan={3}>TOTAL</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expensesReport?.totalSubtotal || 0)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expensesReport?.totalIgicSoportado || 0)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expensesReport?.totalExpenses || 0)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Resumen IGIC */}
+        <TabsContent value="igic">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>IGIC Repercutido (Ventas)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">IGIC 0%:</span>
+                  <span className="font-semibold">{formatCurrency(salesReport?.totalIgic0 || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">IGIC 3%:</span>
+                  <span className="font-semibold">{formatCurrency(salesReport?.totalIgic3 || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">IGIC 7%:</span>
+                  <span className="font-semibold">{formatCurrency(salesReport?.totalIgic7 || 0)}</span>
+                </div>
+                <div className="flex justify-between pt-3 border-t font-bold">
+                  <span>Total IGIC Repercutido:</span>
+                  <span className="text-primary">{formatCurrency(salesReport?.totalIgic || 0)}</span>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>IGIC Soportado (Compras)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">IGIC Soportado:</span>
+                  <span className="font-semibold">{formatCurrency(expensesReport?.totalIgicSoportado || 0)}</span>
+                </div>
+                <div className="flex justify-between pt-3 border-t">
+                  <span>IGIC Repercutido:</span>
+                  <span>{formatCurrency(salesReport?.totalIgic || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>IGIC Soportado:</span>
+                  <span>-{formatCurrency(expensesReport?.totalIgicSoportado || 0)}</span>
+                </div>
+                <div className="flex justify-between pt-3 border-t font-bold">
+                  <span>IGIC a Ingresar:</span>
+                  <span className="text-primary">
+                    {formatCurrency((salesReport?.totalIgic || 0) - (expensesReport?.totalIgicSoportado || 0))}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </div>
-      )}
+        </TabsContent>
+
+        {/* Productos más vendidos */}
+        <TabsContent value="products">
+          <Card>
+            <CardHeader>
+              <CardTitle>Productos Más Vendidos</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {bestProducts.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground">
+                  No hay datos de productos en este periodo
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="text-right">Cantidad Vendida</TableHead>
+                      <TableHead className="text-right">Ingresos Totales</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bestProducts.map((product, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{product.productName}</TableCell>
+                        <TableCell className="text-right">{product.totalQuantity}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(product.totalRevenue)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-}
+};
+
+export default Reports;
