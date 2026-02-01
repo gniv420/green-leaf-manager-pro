@@ -8,12 +8,12 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
-import Members from "@/pages/Members";
-import MemberForm from "@/pages/MemberForm";
-import MemberDetails from "@/pages/MemberDetails";
-import Dispensary from "@/pages/Dispensary";
+import Sales from "@/pages/Sales";
+import Products from "@/pages/Products";
+import Invoices from "@/pages/Invoices";
+import Expenses from "@/pages/Expenses";
+import Customers from "@/pages/Customers";
 import CashRegister from "@/pages/CashRegister";
-import Inventory from "@/pages/Inventory";
 import Reports from "@/pages/Reports";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
@@ -41,12 +41,12 @@ function App() {
                   </ProtectedRoute>
                 }>
                   <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="members" element={<Members />} />
-                  <Route path="members/new" element={<MemberForm />} />
-                  <Route path="members/:id" element={<MemberDetails />} />
-                  <Route path="dispensary" element={<Dispensary />} />
+                  <Route path="sales" element={<Sales />} />
+                  <Route path="invoices" element={<Invoices />} />
+                  <Route path="products" element={<Products />} />
+                  <Route path="expenses" element={<Expenses />} />
+                  <Route path="customers" element={<Customers />} />
                   <Route path="cash-register" element={<CashRegister />} />
-                  <Route path="inventory" element={<Inventory />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="users" element={<Users />} />

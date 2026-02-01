@@ -1,280 +1,21 @@
-// Tipos de datos equivalentes a los que teníamos en Dexie
-export interface User {
-  id?: number;
-  username: string;
-  password: string;
-  fullName: string;
-  isAdmin: boolean;
-  createdAt: string; // Cambiado a string para SQLite
-  lastLogin?: string; // Cambiado a string para SQLite
-}
-
-export interface Member {
-  id?: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  dateOfBirth?: Date | string;
-  address?: string;
-  city?: string;
-  postalCode?: string;
-  idNumber?: string;
-  membershipType: "standard" | "premium";
-  membershipDate: Date | string;
-  preferredProductType?: string;
-  consumptionMethod?: string;
-  medicalConditions?: string;
-  notes?: string;
-  isActive: boolean;
-  createdAt: string; // Cambiado a string para SQLite
-  updatedAt: string; // Cambiado a string para SQLite
-}
-
-export interface MemberTransaction {
-  id?: number;
-  memberId: number;
-  amount: number;
-  type: 'deposit' | 'withdrawal';
-  notes?: string;
-  userId: number;
-  createdAt: string; // Cambiado a string para SQLite
-}
-
-export interface Product {
-  id?: number;
-  name: string;
-  description?: string;
-  category: string;
-  type: string; // ProductType convertido a string
-  price: number;
-  costPrice?: number;
-  stockGrams: number;
-  isVisible?: boolean;
-  image?: string;
-  notes?: string;
-  createdAt: string; // Cambiado a string para SQLite
-  updatedAt: string; // Cambiado a string para SQLite
-}
-
-export interface Dispensary {
-  id?: number;
-  memberId: number;
-  productId: number;
-  quantity: number;
-  price: number;
-  paymentMethod: 'cash' | 'bizum' | 'wallet';
-  notes?: string;
-  userId: number;
-  createdAt: string; // Cambiado a string para SQLite
-}
-
-export interface CashRegister {
-  id?: number;
-  openDate: string; // Cambiado a string para SQLite
-  closeDate?: string; // Cambiado a string para SQLite
-  initialBalance: number;
-  finalBalance?: number;
-  status: 'open' | 'closed';
-  openingAmount: number;
-  closingAmount?: number;
-  userId: number;
-  notes?: string;
-  openedAt: string; // Cambiado a string para SQLite
-  closedAt?: string; // Cambiado a string para SQLite
-}
-
-export interface CashTransaction {
-  id?: number;
-  cashRegisterId: number;
-  type: 'income' | 'expense';
-  amount: number;
-  concept: string;
-  notes?: string;
-  userId: number;
-  paymentMethod: 'cash' | 'bizum' | 'wallet';
-  createdAt: string; // Cambiado a string para SQLite
-}
-
-export interface Document {
-  id?: number;
-  memberId: number;
-  type: string; // DocumentType convertido a string
-  uploadDate: string; // Cambiado a string para SQLite
-  name: string;
-  fileName: string;
-  contentType: string;
-  size: number;
-  data: Buffer;
-  createdAt: string; // Cambiado a string para SQLite
-}
+// Exportar tipos de datos
+export type {
+  User,
+  Product,
+  Customer,
+  Invoice,
+  InvoiceLine,
+  Expense,
+  CashRegister,
+  CashMovement
+} from './sqlite-db';
 
 // Import SQLite database implementation
 import { db as sqliteDb } from './sqlite-db';
 
-// Export the database interface with its collection-like API to mimic Dexie
-export class ClubDatabase {
-  // Mimic the Dexie collection structure for backward compatibility
-  users = {
-    get: async (id: number) => await sqliteDb.getUserById(id),
-    where: (field: string) => ({
-      equals: (value: any) => {
-        if (field === 'username') {
-          return {
-            first: async () => await sqliteDb.getUserByUsername(value)
-          };
-        }
-        return { first: async () => null };
-      }
-    }),
-    toArray: async () => await sqliteDb.getUsers(),
-    add: async (user: any) => await sqliteDb.addUser(user),
-    update: async (id: number, user: any) => await sqliteDb.updateUser(id, user),
-    delete: async (id: number) => await sqliteDb.deleteUser(id)
-  };
-
-  members = {
-    get: async (id: number) => await sqliteDb.getMemberById(id),
-    where: (field: string) => ({
-      equals: (value: any) => {
-        if (field === 'rfidCode') {
-          return {
-            first: async () => await sqliteDb.getMemberByRfid(value)
-          };
-        }
-        return { first: async () => null };
-      }
-    }),
-    toArray: async () => await sqliteDb.getMembers(),
-    add: async (member: any) => await sqliteDb.addMember(member),
-    update: async (id: number, member: any) => await sqliteDb.updateMember(id, member),
-    delete: async (id: number) => await sqliteDb.deleteMember(id)
-  };
-
-  products = {
-    toArray: async () => await sqliteDb.getProducts(),
-    get: async (id: number) => await sqliteDb.getProductById(id),
-    add: async (product: any) => await sqliteDb.addProduct(product),
-    update: async (id: number, product: any) => await sqliteDb.updateProduct(id, product),
-    delete: async (id: number) => await sqliteDb.deleteProduct(id),
-    where: (field: string) => ({
-      equals: (value: any) => {
-        if (field === 'isVisible') {
-          return {
-            toArray: async () => value ? await sqliteDb.getVisibleProducts() : []
-          };
-        }
-        return { toArray: async () => [] };
-      }
-    }),
-  };
-
-  dispensary = {
-    toArray: async () => await sqliteDb.getDispensaryRecords(),
-    where: (field: string) => ({
-      equals: (value: any) => {
-        if (field === 'memberId') {
-          return {
-            toArray: async () => await sqliteDb.getDispensaryForMember(value)
-          };
-        }
-        return { toArray: async () => [] };
-      }
-    }),
-    add: async (record: any) => await sqliteDb.addDispensaryRecord(record),
-    delete: async (id: number) => await sqliteDb.deleteDispensary(id)
-  };
-
-  documents = {
-    where: (field: string) => ({
-      equals: (value: any) => {
-        if (field === 'memberId') {
-          return {
-            toArray: async () => await sqliteDb.getDocuments(value)
-          };
-        }
-        return { toArray: async () => [] };
-      }
-    }),
-    add: async (document: any) => await sqliteDb.addDocument(document),
-    get: async (id: number) => await sqliteDb.getDocumentById(id),
-    delete: async (id: number) => await sqliteDb.deleteDocument(id)
-  };
-
-  memberTransactions = {
-    where: (field: string) => ({
-      equals: (value: any) => {
-        if (field === 'memberId') {
-          return {
-            toArray: async () => await sqliteDb.getMemberTransactions(value),
-            reverse: () => ({
-              sortBy: async (sortField: string) => {
-                const transactions = await sqliteDb.getMemberTransactions(value);
-                return transactions.sort((a, b) => {
-                  if (sortField === 'createdAt') {
-                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                  }
-                  return 0;
-                });
-              }
-            })
-          };
-        }
-        return { 
-          toArray: async () => [],
-          reverse: () => ({
-            sortBy: async () => []
-          })
-        };
-      }
-    }),
-    add: async (transaction: any) => await sqliteDb.addMemberTransaction(transaction)
-  };
-
-  cashTransactions = {
-    where: (field: string) => ({
-      equals: (value: any) => {
-        if (field === 'cashRegisterId') {
-          return {
-            toArray: async () => await sqliteDb.getCashTransactions(value)
-          };
-        }
-        return { toArray: async () => [] };
-      }
-    }),
-    add: async (transaction: any) => await sqliteDb.addCashTransaction(transaction)
-  };
-
-  // Method to generate member codes
-  async generateMemberCode(firstName: string, lastName: string): Promise<string> {
-    return await sqliteDb.generateMemberCode(firstName, lastName);
-  }
-
-  // Direct methods from SQLite database
-  async getOpenCashRegister() {
-    return await sqliteDb.getOpenCashRegister();
-  }
-
-  async getCashRegisters() {
-    return await sqliteDb.getCashRegisters();
-  }
-
-  async getCashTransactions(cashRegisterId: number) {
-    return await sqliteDb.getCashTransactions(cashRegisterId);
-  }
-
-  async addCashRegister(register: any) {
-    return await sqliteDb.addCashRegister(register);
-  }
-
-  async updateCashRegister(id: number, register: any) {
-    return await sqliteDb.updateCashRegister(id, register);
-  }
-
-  async addCashTransaction(transaction: any) {
-    return await sqliteDb.addCashTransaction(transaction);
-  }
-
+// Export the database interface
+export class PizzeriaDatabase {
+  // USUARIOS
   async getUsers() {
     return await sqliteDb.getUsers();
   }
@@ -299,30 +40,7 @@ export class ClubDatabase {
     return await sqliteDb.deleteUser(id);
   }
 
-  async getMembers() {
-    return await sqliteDb.getMembers();
-  }
-
-  async getMemberById(id: number) {
-    return await sqliteDb.getMemberById(id);
-  }
-
-  async getMemberByRfid(rfidCode: string) {
-    return await sqliteDb.getMemberByRfid(rfidCode);
-  }
-
-  async addMember(member: any) {
-    return await sqliteDb.addMember(member);
-  }
-
-  async updateMember(id: number, member: any) {
-    return await sqliteDb.updateMember(id, member);
-  }
-
-  async deleteMember(id: number) {
-    return await sqliteDb.deleteMember(id);
-  }
-
+  // PRODUCTOS
   async getProducts() {
     return await sqliteDb.getProducts();
   }
@@ -333,6 +51,10 @@ export class ClubDatabase {
 
   async getProductById(id: number) {
     return await sqliteDb.getProductById(id);
+  }
+
+  async getProductsByCategory(category: string) {
+    return await sqliteDb.getProductsByCategory(category);
   }
 
   async addProduct(product: any) {
@@ -347,46 +69,129 @@ export class ClubDatabase {
     return await sqliteDb.deleteProduct(id);
   }
 
-  async getDispensaryRecords() {
-    return await sqliteDb.getDispensaryRecords();
+  // CLIENTES
+  async getCustomers() {
+    return await sqliteDb.getCustomers();
   }
 
-  async getDispensaryForMember(memberId: number) {
-    return await sqliteDb.getDispensaryForMember(memberId);
+  async getCustomerById(id: number) {
+    return await sqliteDb.getCustomerById(id);
   }
 
-  async addDispensaryRecord(record: any) {
-    return await sqliteDb.addDispensaryRecord(record);
+  async addCustomer(customer: any) {
+    return await sqliteDb.addCustomer(customer);
   }
 
-  async getRecentDispensations(limit: number) {
-    return await sqliteDb.getRecentDispensations(limit);
+  async updateCustomer(id: number, customer: any) {
+    return await sqliteDb.updateCustomer(id, customer);
   }
 
-  async getMemberTransactions(memberId: number) {
-    return await sqliteDb.getMemberTransactions(memberId);
+  async deleteCustomer(id: number) {
+    return await sqliteDb.deleteCustomer(id);
   }
 
-  async addMemberTransaction(transaction: any) {
-    return await sqliteDb.addMemberTransaction(transaction);
+  // FACTURAS
+  async generateInvoiceNumber() {
+    return await sqliteDb.generateInvoiceNumber();
   }
 
-  async getDocuments(memberId: number) {
-    return await sqliteDb.getDocuments(memberId);
+  async getInvoices() {
+    return await sqliteDb.getInvoices();
   }
 
-  async addDocument(document: any) {
-    return await sqliteDb.addDocument(document);
+  async getInvoiceById(id: number) {
+    return await sqliteDb.getInvoiceById(id);
   }
 
-  async deleteDocument(id: number) {
-    return await sqliteDb.deleteDocument(id);
+  async getInvoicesByDateRange(startDate: string, endDate: string) {
+    return await sqliteDb.getInvoicesByDateRange(startDate, endDate);
   }
 
-  async getDocumentById(id: number) {
-    return await sqliteDb.getDocumentById(id);
+  async addInvoice(invoice: any) {
+    return await sqliteDb.addInvoice(invoice);
   }
 
+  async updateInvoice(id: number, invoice: any) {
+    return await sqliteDb.updateInvoice(id, invoice);
+  }
+
+  async deleteInvoice(id: number) {
+    return await sqliteDb.deleteInvoice(id);
+  }
+
+  // LÍNEAS DE FACTURA
+  async getInvoiceLines(invoiceId: number) {
+    return await sqliteDb.getInvoiceLines(invoiceId);
+  }
+
+  async addInvoiceLine(line: any) {
+    return await sqliteDb.addInvoiceLine(line);
+  }
+
+  async deleteInvoiceLine(id: number) {
+    return await sqliteDb.deleteInvoiceLine(id);
+  }
+
+  async deleteInvoiceLines(invoiceId: number) {
+    return await sqliteDb.deleteInvoiceLines(invoiceId);
+  }
+
+  // GASTOS
+  async getExpenses() {
+    return await sqliteDb.getExpenses();
+  }
+
+  async getExpenseById(id: number) {
+    return await sqliteDb.getExpenseById(id);
+  }
+
+  async getExpensesByDateRange(startDate: string, endDate: string) {
+    return await sqliteDb.getExpensesByDateRange(startDate, endDate);
+  }
+
+  async addExpense(expense: any) {
+    return await sqliteDb.addExpense(expense);
+  }
+
+  async updateExpense(id: number, expense: any) {
+    return await sqliteDb.updateExpense(id, expense);
+  }
+
+  async deleteExpense(id: number) {
+    return await sqliteDb.deleteExpense(id);
+  }
+
+  // CAJA
+  async getOpenCashRegister() {
+    return await sqliteDb.getOpenCashRegister();
+  }
+
+  async getCashRegisters() {
+    return await sqliteDb.getCashRegisters();
+  }
+
+  async addCashRegister(register: any) {
+    return await sqliteDb.addCashRegister(register);
+  }
+
+  async updateCashRegister(id: number, register: any) {
+    return await sqliteDb.updateCashRegister(id, register);
+  }
+
+  // MOVIMIENTOS DE CAJA
+  async getCashMovements(cashRegisterId: number) {
+    return await sqliteDb.getCashMovements(cashRegisterId);
+  }
+
+  async addCashMovement(movement: any) {
+    return await sqliteDb.addCashMovement(movement);
+  }
+
+  async getTodayMovements() {
+    return await sqliteDb.getTodayMovements();
+  }
+
+  // EXPORTACIÓN E IMPORTACIÓN
   async exportToFile() {
     return await sqliteDb.exportToFile();
   }
@@ -395,13 +200,19 @@ export class ClubDatabase {
     return await sqliteDb.importFromJson(jsonData);
   }
 
-  async deleteDispensary(id: number) {
-    return await sqliteDb.deleteDispensary(id);
+  // INFORMES
+  async getSalesReport(startDate: string, endDate: string) {
+    return await sqliteDb.getSalesReport(startDate, endDate);
+  }
+
+  async getExpensesReport(startDate: string, endDate: string) {
+    return await sqliteDb.getExpensesReport(startDate, endDate);
+  }
+
+  async getBestSellingProducts(startDate: string, endDate: string, limit?: number) {
+    return await sqliteDb.getBestSellingProducts(startDate, endDate, limit);
   }
 }
 
 // Create and export a singleton instance
-export const db = new ClubDatabase();
-
-// Export type only, not the conflicting interface
-export type { CashRegister as CashRegisterType, CashTransaction as CashTransactionType } from './sqlite-db';
+export const db = new PizzeriaDatabase();
